@@ -577,23 +577,41 @@ function saveSecurityToStorage() {
   localStorage.setItem(STORAGE_KEYS.SECURITY, JSON.stringify(state.security));
 }
 
+const PENDING_DRIVE_SYNC_KEY = 'ft_pending_drive_sync_v1';
+
+function hasPendingDriveSync() {
+  return localStorage.getItem(PENDING_DRIVE_SYNC_KEY) === 'true';
+}
+
+function setPendingDriveSync(pending) {
+  if (pending) {
+    localStorage.setItem(PENDING_DRIVE_SYNC_KEY, 'true');
+  } else {
+    localStorage.removeItem(PENDING_DRIVE_SYNC_KEY);
+  }
+}
+
 function saveTransactionsToStorage() {
   localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(state.transactions));
+  setPendingDriveSync(true);
   triggerSilentAutoBackupIfConnected();
 }
 
 function saveBudgetsToStorage() {
   localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(state.budgets));
+  setPendingDriveSync(true);
   triggerSilentAutoBackupIfConnected();
 }
 
 function saveCustomCategoriesToStorage() {
   localStorage.setItem(STORAGE_KEYS.CUSTOM_CATEGORIES, JSON.stringify(state.customCategories));
+  setPendingDriveSync(true);
   triggerSilentAutoBackupIfConnected();
 }
 
 function saveWalletsToStorage() {
   localStorage.setItem(STORAGE_KEYS.WALLETS, JSON.stringify(state.wallets));
+  setPendingDriveSync(true);
   triggerSilentAutoBackupIfConnected();
 }
 
@@ -818,10 +836,10 @@ function switchTab(tabName) {
         if (tabName === 'savings') activeColor = 'text-blue-400';
         if (tabName === 'wallets') activeColor = 'text-purple-400';
         if (tabName === 'settings') activeColor = 'text-blue-400';
-        btn.className = `mobile-tab-btn tab-btn-active flex flex-col items-center justify-center py-1.5 px-1 ${activeColor} font-bold transition-all`;
+        btn.className = `mobile-tab-btn tab-btn-active flex flex-col items-center justify-center py-2 px-1 ${activeColor} font-bold transition-all`;
       } else {
         btn.className =
-          'mobile-tab-btn flex flex-col items-center justify-center py-1.5 px-1 text-slate-400 hover:text-slate-200 font-medium transition-all';
+          'mobile-tab-btn flex flex-col items-center justify-center py-2 px-1 text-slate-400 hover:text-slate-200 font-semibold transition-all';
       }
     }
   });
@@ -2416,25 +2434,303 @@ function getDetectedDeviceName() {
   return 'Device';
 }
 
+function buildSafeDriveFolderUrl(folderId, email) {
+  const cleanEmail = (email || (state.googleAccount && state.googleAccount.email) || '').trim();
+  const targetUrl = folderId
+    ? `https://drive.google.com/drive/folders/${folderId}`
+    : 'https://drive.google.com/drive/my-drive';
+  if (cleanEmail) {
+    return `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(
+      cleanEmail
+    )}&continue=${encodeURIComponent(targetUrl)}`;
+  }
+  return targetUrl;
+}
+
+/**
+ * Membuka Folder Google Drive dengan memastikan folder sudah terbuat & memiliki izin akses tautan
+ * agar tidak pernah muncul error 404 meskipun browser memiliki banyak akun Google yang sedang login.
+ */
+async function handleOpenGoogleDriveFolder(event, preferredFolderId, email) {
+  if (event) event.preventDefault();
+  const cleanEmail = (email || (state.googleAccount && state.googleAccount.email) || '').trim();
+
+  // Buka tab baru secara sinkron saat klik agar tidak diblokir oleh popup blocker browser
+  const driveWin = window.open('about:blank', '_blank');
+  if (driveWin && driveWin.document) {
+    driveWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Membuka Google Drive - FinanceTracker</title>
+        <style>
+          body { margin: 0; background: #090d16; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center; }
+          .box { padding: 28px 32px; border-radius: 18px; background: #111827; border: 1px solid rgba(16,185,129,0.3); max-width: 390px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+          .spinner { width: 36px; height: 36px; border: 3px solid rgba(16,185,129,0.2); border-top-color: #10b981; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+          @keyframes spin { to { transform: rotate(360deg); } }
+          h3 { margin: 0 0 6px; font-size: 16px; color: #10b981; }
+          p { margin: 0; font-size: 12px; color: #94a3b8; line-height: 1.5; }
+        </style>
+      </head>
+      <body>
+        <div class="box">
+          <div class="spinner"></div>
+          <h3>Membuka Folder Google Drive...</h3>
+          <p>Menyiapkan folder <b>FinanceTracker - Cadangan Transaksi</b> untuk akun ${cleanEmail || 'Google Anda'}.</p>
+        </div>
+      </body>
+      </html>
+    `);
+    driveWin.document.close();
+  }
+
+  const navigateDriveTab = (url) => {
+    if (driveWin && !driveWin.closed) {
+      driveWin.location.replace(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
+  let activeToken =
+    latestGoogleAccessToken || (state.googleAccount && state.googleAccount.accessToken) || '';
+  let targetFolderId = (
+    preferredFolderId ||
+    (state.googleAccount && state.googleAccount.driveFolderId) ||
+    ''
+  ).trim();
+
+  if (!targetFolderId && Array.isArray(state.driveBackups)) {
+    const matchedBackup = state.driveBackups.find(
+      (b) => b.folderId && (!b.email || b.email.toLowerCase() === cleanEmail.toLowerCase())
+    );
+    if (matchedBackup) {
+      targetFolderId = matchedBackup.folderId;
+    }
+  }
+
+  const verifyAndOpenWithToken = async (token) => {
+    try {
+      let folderValid = false;
+      if (targetFolderId) {
+        const checkRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${targetFolderId}?fields=id,name,trashed`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (checkRes.status === 401) {
+          return 'TOKEN_EXPIRED';
+        }
+        if (checkRes.ok) {
+          const fileMeta = await checkRes.json();
+          if (fileMeta && fileMeta.id && !fileMeta.trashed) {
+            folderValid = true;
+          }
+        }
+      }
+
+      if (!folderValid) {
+        const todayISO = getTodayLocalISO();
+        const monthFolder = todayISO.slice(0, 7);
+        const fileName = `Cadangan_Transaksi_${todayISO}.json`;
+        const payload = buildFullTransactionBackupPayload();
+        const driveResult = await uploadBackupToRealGoogleDrive(
+          token,
+          fileName,
+          payload,
+          monthFolder
+        );
+        if (driveResult && driveResult.error === 'TOKEN_EXPIRED') {
+          return 'TOKEN_EXPIRED';
+        }
+        if (driveResult && (driveResult.mainFolderId || driveResult.monthFolderId)) {
+          targetFolderId = preferredFolderId
+            ? driveResult.monthFolderId || driveResult.mainFolderId
+            : driveResult.mainFolderId || driveResult.monthFolderId;
+          folderValid = true;
+          if (state.googleAccount && driveResult.mainFolderId) {
+            state.googleAccount.driveFolderId = driveResult.mainFolderId;
+            state.googleAccount.folderOwnerEmail = cleanEmail;
+            state.googleAccount.driveFolderPublic = true;
+            saveGoogleAccountToStorage();
+          }
+          if (Array.isArray(state.driveBackups)) {
+            state.driveBackups.forEach((b) => {
+              if (!b.email || b.email.toLowerCase() === cleanEmail.toLowerCase()) {
+                b.folderId = driveResult.monthFolderId || driveResult.mainFolderId;
+              }
+            });
+            saveDriveBackupsToStorage();
+          }
+          renderSettingsSection();
+          if (window.lucide) window.lucide.createIcons();
+        }
+      }
+
+      if (folderValid && targetFolderId) {
+        await ensureDriveFolderLinkPermission(token, targetFolderId);
+        if (
+          state.googleAccount &&
+          state.googleAccount.driveFolderId &&
+          state.googleAccount.driveFolderId !== targetFolderId
+        ) {
+          await ensureDriveFolderLinkPermission(token, state.googleAccount.driveFolderId);
+        }
+        if (state.googleAccount) {
+          state.googleAccount.driveFolderPublic = true;
+          if (!state.googleAccount.driveFolderId) {
+            state.googleAccount.driveFolderId = targetFolderId;
+          }
+          state.googleAccount.folderOwnerEmail = cleanEmail;
+          saveGoogleAccountToStorage();
+        }
+        navigateDriveTab(`https://drive.google.com/drive/folders/${targetFolderId}`);
+        return 'OPENED';
+      }
+      return 'FALLBACK';
+    } catch (err) {
+      console.warn('Error verifying Drive folder:', err);
+      return 'FALLBACK';
+    }
+  };
+
+  if (activeToken && navigator.onLine !== false) {
+    const status = await verifyAndOpenWithToken(activeToken);
+    if (status === 'OPENED') return;
+    if (status === 'TOKEN_EXPIRED') {
+      activeToken = '';
+      latestGoogleAccessToken = '';
+      if (state.googleAccount) {
+        state.googleAccount.accessToken = '';
+        state.googleAccount.accessTokenExpiresAt = 0;
+        saveGoogleAccountToStorage();
+      }
+    }
+  }
+
+  // Jika folder sudah memiliki izin link publik sebelumnya, langsung buka tanpa error 404
+  if (targetFolderId && state.googleAccount && state.googleAccount.driveFolderPublic) {
+    navigateDriveTab(`https://drive.google.com/drive/folders/${targetFolderId}`);
+    return;
+  }
+
+  // Jika token habis dan GIS tersedia, minta token baru lalu buka folder
+  const clientId = getGoogleClientId();
+  const isHttpOrigin = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+  if (
+    !activeToken &&
+    navigator.onLine !== false &&
+    clientId &&
+    isHttpOrigin &&
+    window.google &&
+    window.google.accounts &&
+    window.google.accounts.oauth2
+  ) {
+    try {
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: GOOGLE_DRIVE_SCOPES,
+        hint: cleanEmail,
+        prompt: '',
+        callback: async (tokenResponse) => {
+          if (tokenResponse && tokenResponse.access_token) {
+            latestGoogleAccessToken = tokenResponse.access_token;
+            if (state.googleAccount) {
+              state.googleAccount.accessToken = tokenResponse.access_token;
+              state.googleAccount.accessTokenExpiresAt = Date.now() + 3300 * 1000;
+              saveGoogleAccountToStorage();
+            }
+            const resStatus = await verifyAndOpenWithToken(tokenResponse.access_token);
+            if (resStatus === 'OPENED') return;
+          }
+          navigateDriveTab(buildSafeDriveFolderUrl('', cleanEmail));
+        },
+        error_callback: () => {
+          navigateDriveTab(buildSafeDriveFolderUrl('', cleanEmail));
+        }
+      });
+      tokenClient.requestAccessToken({ prompt: '' });
+      return;
+    } catch (e) {
+      console.warn('Token refresh fallback:', e);
+    }
+  }
+
+  // Fallback 100% bebas 404: Buka halaman My Drive melalui AccountChooser akun terkait
+  navigateDriveTab(buildSafeDriveFolderUrl('', cleanEmail));
+}
+
 function renderSettingsSection() {
   applyThemeToDOM();
   populateSettingsPreferencesDropdowns();
   renderSecuritySettingsArea();
 
+  // Pastikan driveFolderId hanya direset jika jelas milik email yang berbeda
+  if (
+    state.googleAccount &&
+    state.googleAccount.driveFolderId &&
+    state.googleAccount.folderOwnerEmail &&
+    state.googleAccount.folderOwnerEmail.toLowerCase() !==
+      (state.googleAccount.email || '').toLowerCase()
+  ) {
+    state.googleAccount.driveFolderId = '';
+    state.googleAccount.driveFolderPublic = false;
+    saveGoogleAccountToStorage();
+  }
+
+  // Jika driveFolderId kosong tetapi ada riwayat cadangan milik akun yang sedang login, pulihkan folderId-nya
+  if (
+    state.googleAccount &&
+    state.googleAccount.email &&
+    !state.googleAccount.driveFolderId &&
+    Array.isArray(state.driveBackups)
+  ) {
+    const existingForAcc = state.driveBackups.find(
+      (b) =>
+        b.folderId &&
+        (!b.email || b.email.toLowerCase() === state.googleAccount.email.toLowerCase())
+    );
+    if (existingForAcc && existingForAcc.folderId) {
+      state.googleAccount.driveFolderId = existingForAcc.folderId;
+      state.googleAccount.folderOwnerEmail = state.googleAccount.email;
+      saveGoogleAccountToStorage();
+    }
+  }
+
   const accountAreaEl = document.getElementById('googleAccountCardArea');
   const authBadgeEl = document.getElementById('driveAuthBadge');
   const backupCountBadgeEl = document.getElementById('driveBackupCountBadge');
   const historyListEl = document.getElementById('driveBackupHistoryList');
+  const autoSyncBannerEl = document.getElementById('autoSyncLiveStatusBanner');
+  const autoSyncTextEl = document.getElementById('autoSyncLiveStatusText');
 
   const isConnected = Boolean(state.googleAccount && state.googleAccount.email);
+  const isOnline = navigator.onLine !== false;
+  const isPendingSync = hasPendingDriveSync();
+
+  const visibleBackups = Array.isArray(state.driveBackups)
+    ? isConnected
+      ? state.driveBackups.filter(
+          (b) =>
+            !b.email ||
+            b.email.toLowerCase() === state.googleAccount.email.toLowerCase()
+        )
+      : state.driveBackups
+    : [];
 
   if (authBadgeEl) {
     if (isConnected) {
-      authBadgeEl.textContent = state.googleAccount.autoBackup
-        ? t('drive_status_autosync')
-        : t('drive_status_connected');
-      authBadgeEl.className =
-        'px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 shrink-0';
+      if (!isOnline) {
+        authBadgeEl.textContent = 'Menunggu Internet';
+        authBadgeEl.className =
+          'px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/35 shrink-0';
+      } else {
+        authBadgeEl.textContent = state.googleAccount.autoBackup
+          ? t('drive_status_autosync')
+          : t('drive_status_connected');
+        authBadgeEl.className =
+          'px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/35 shrink-0';
+      }
     } else {
       authBadgeEl.textContent = t('drive_status_unconnected');
       authBadgeEl.className =
@@ -2442,8 +2738,32 @@ function renderSettingsSection() {
     }
   }
 
+  if (autoSyncBannerEl && autoSyncTextEl) {
+    if (!isConnected) {
+      autoSyncBannerEl.className =
+        'p-3 rounded-xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-2.5 text-[11px] text-slate-400';
+      autoSyncTextEl.innerHTML =
+        '<span class="font-bold text-slate-200">Cadangan Otomatis:</span> Login dengan akun Google di atas agar setiap transaksi otomatis dicadangkan ke Google Drive.';
+    } else if (!isOnline) {
+      autoSyncBannerEl.className =
+        'p-3 rounded-xl bg-amber-950/25 border border-amber-500/35 flex items-start gap-2.5 text-[11px] text-amber-200';
+      autoSyncTextEl.innerHTML =
+        '<span class="font-bold text-amber-300">⏳ Mode Offline (Menunggu Internet):</span> Transaksi tersimpan aman di perangkat &amp; akan otomatis dicadangkan ke Google Drive begitu internet kembali terhubung.';
+    } else if (isPendingSync) {
+      autoSyncBannerEl.className =
+        'p-3 rounded-xl bg-blue-950/25 border border-blue-500/35 flex items-start gap-2.5 text-[11px] text-blue-200';
+      autoSyncTextEl.innerHTML =
+        '<span class="font-bold text-blue-300">🔄 Sinkronisasi Otomatis:</span> Menyiapkan pencadangan transaksi terbaru ke folder Google Drive Anda...';
+    } else {
+      autoSyncBannerEl.className =
+        'p-3 rounded-xl bg-emerald-950/25 border border-emerald-500/30 flex items-start gap-2.5 text-[11px] text-slate-300';
+      autoSyncTextEl.innerHTML =
+        '<span class="font-bold text-emerald-300">✅ Cadangan Otomatis Aktif:</span> Setiap transaksi otomatis dicadangkan ke folder Google Drive Anda saat terhubung ke internet.';
+    }
+  }
+
   if (backupCountBadgeEl) {
-    const count = state.driveBackups ? state.driveBackups.length : 0;
+    const count = visibleBackups.length;
     backupCountBadgeEl.textContent = `${count} ${t('drive_backups_count_suffix')}`;
   }
 
@@ -2486,9 +2806,13 @@ function renderSettingsSection() {
         .slice(0, 2)
         .toUpperCase();
 
-      const driveFolderUrl = state.googleAccount.driveFolderId
-        ? `https://drive.google.com/drive/folders/${state.googleAccount.driveFolderId}`
-        : 'https://drive.google.com/drive/my-drive';
+      const validFolderId =
+        !state.googleAccount.folderOwnerEmail ||
+        state.googleAccount.folderOwnerEmail.toLowerCase() ===
+          state.googleAccount.email.toLowerCase()
+          ? state.googleAccount.driveFolderId || ''
+          : '';
+      const safeAccEmail = (state.googleAccount.email || '').replace(/'/g, "\\'");
 
       accountAreaEl.innerHTML = `
         <div class="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2.5">
@@ -2497,22 +2821,21 @@ function renderSettingsSection() {
               <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 text-slate-950 font-extrabold text-sm flex items-center justify-center shrink-0">
                 ${initials || 'G'}
               </div>
-              <div class="min-w-0">
+              <div class="min-w-0 flex-1">
                 <div class="text-xs sm:text-sm font-bold text-white truncate">${state.googleAccount.name}</div>
                 <div class="text-[11px] text-emerald-400 truncate">${state.googleAccount.email}</div>
                 <div class="text-[10px] text-slate-400 truncate">${t('drive_detected_on')} ${state.googleAccount.deviceLabel || getDetectedDeviceName()}</div>
               </div>
             </div>
             <div class="flex flex-wrap items-center gap-1.5 shrink-0">
-              <a
-                href="${driveFolderUrl}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1 transition-colors"
+              <button
+                type="button"
+                onclick="handleOpenGoogleDriveFolder(event, '${validFolderId}', '${safeAccEmail}')"
+                class="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 inline-flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
                 <span>Buka Folder Drive</span>
-              </a>
+              </button>
               <button
                 type="button"
                 onclick="openGoogleAuthModal(false)"
@@ -2543,70 +2866,85 @@ function renderSettingsSection() {
   }
 
   if (historyListEl) {
-    if (!state.driveBackups || state.driveBackups.length === 0) {
+    if (!visibleBackups || visibleBackups.length === 0) {
       historyListEl.innerHTML = `
         <div class="py-4 px-3 rounded-xl bg-slate-900/50 border border-slate-800/80 text-center text-xs text-slate-400">
           ${t('drive_empty_backups')}
         </div>
       `;
     } else {
-      historyListEl.innerHTML = state.driveBackups
+      historyListEl.innerHTML = visibleBackups
         .slice(0, 6)
         .map((b) => {
-          const folderPath = b.folderPath || `FinanceTracker - Cadangan Transaksi / ${(b.createdAt || '').slice(0, 7) || getTodayLocalISO().slice(0, 7)}`;
-          const itemFolderUrl =
-            b.driveFolderUrl ||
-            (state.googleAccount && state.googleAccount.driveFolderId
-              ? `https://drive.google.com/drive/folders/${state.googleAccount.driveFolderId}`
-              : 'https://drive.google.com/drive/my-drive');
+          const shortPeriod =
+            (b.fileName && b.fileName.slice(19, 26)) || getTodayLocalISO().slice(0, 7);
+          const compactFolderLabel = `FinanceTracker / ${shortPeriod}`;
+          const validItemFolderId =
+            b.folderId ||
+            (state.googleAccount &&
+            (!state.googleAccount.folderOwnerEmail ||
+              !b.email ||
+              state.googleAccount.folderOwnerEmail.toLowerCase() === b.email.toLowerCase())
+              ? state.googleAccount.driveFolderId || ''
+              : '');
+          const safeItemEmail = (b.email || (state.googleAccount && state.googleAccount.email) || '').replace(/'/g, "\\'");
           return `
-          <div class="p-3 rounded-xl bg-slate-900/65 border border-slate-800 flex items-center justify-between gap-2.5">
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
-                <i data-lucide="folder-kanban" class="w-4 h-4"></i>
-              </div>
-              <div class="min-w-0">
-                <a
-                  href="${itemFolderUrl}"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-blue-400 hover:underline truncate"
-                >
-                  <i data-lucide="folder" class="w-3 h-3 shrink-0"></i>
-                  <span class="truncate">${folderPath}</span>
-                </a>
-                <div class="text-xs font-bold text-white truncate mt-0.5">${b.fileName}</div>
-                <div class="text-[10px] text-slate-400 truncate">
-                  ${b.txCount || 0} ${t('tx_count_suffix')} • ${b.walletCount || 0} ${t('nav_wallets')} • <span class="text-emerald-400">${b.email}</span> • ${b.createdAt}
+          <div class="p-3 rounded-xl bg-slate-900/65 border border-slate-800/90 space-y-2">
+            <!-- Baris Atas: Info File + Tombol Aksi (Tidak Bertabrakan) -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-start gap-2.5 min-w-0 flex-1 overflow-hidden">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 mt-0.5">
+                  <i data-lucide="folder-kanban" class="w-4 h-4"></i>
+                </div>
+                <div class="min-w-0 flex-1 overflow-hidden">
+                  <button
+                    type="button"
+                    onclick="handleOpenGoogleDriveFolder(event, '${validItemFolderId}', '${safeItemEmail}')"
+                    class="inline-flex items-center gap-1 max-w-full px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/25 text-[10px] font-semibold text-blue-300 hover:bg-blue-500/20 transition-colors cursor-pointer"
+                  >
+                    <i data-lucide="folder" class="w-3 h-3 shrink-0 text-blue-400"></i>
+                    <span class="truncate">${compactFolderLabel}</span>
+                  </button>
+                  <div class="text-xs font-bold text-white truncate mt-1" title="${b.fileName}">${b.fileName}</div>
                 </div>
               </div>
+
+              <div class="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onclick="handleOpenGoogleDriveFolder(event, '${validItemFolderId}', '${safeItemEmail}')"
+                  class="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-colors cursor-pointer"
+                  title="Buka Folder di Google Drive"
+                >
+                  <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                </button>
+                <button
+                  type="button"
+                  onclick="downloadBackupSnapshotJson('${b.id}')"
+                  class="p-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 transition-colors"
+                  title="Download (.json)"
+                >
+                  <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                </button>
+                <button
+                  type="button"
+                  onclick="deleteBackupHistoryItem('${b.id}')"
+                  class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 border border-rose-500/25 transition-colors"
+                  title="${t('btn_reset')}"
+                >
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
             </div>
-            <div class="flex items-center gap-1 shrink-0">
-              <a
-                href="${itemFolderUrl}"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-colors"
-                title="Buka Folder di Google Drive"
-              >
-                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-              </a>
-              <button
-                type="button"
-                onclick="downloadBackupSnapshotJson('${b.id}')"
-                class="p-1.5 rounded-lg bg-blue-500/15 hover:bg-blue-500/30 text-blue-300 border border-blue-500/30 transition-colors"
-                title="Download (.json)"
-              >
-                <i data-lucide="download" class="w-3.5 h-3.5"></i>
-              </button>
-              <button
-                type="button"
-                onclick="deleteBackupHistoryItem('${b.id}')"
-                class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 border border-rose-500/25 transition-colors"
-                title="${t('btn_reset')}"
-              >
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              </button>
+
+            <!-- Baris Bawah: Statistik, Email Akun & Waktu Cadangan -->
+            <div class="pt-1.5 border-t border-slate-800/70 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-[10px] text-slate-400">
+              <div class="flex items-center gap-1.5 min-w-0 truncate">
+                <span class="font-semibold text-slate-300">${b.txCount || 0} ${t('tx_count_suffix')} • ${b.walletCount || 0} ${t('nav_wallets')}</span>
+                <span>•</span>
+                <span class="text-emerald-400 font-medium truncate">${b.email || ''}</span>
+              </div>
+              <span class="text-slate-500 font-mono-num shrink-0">${b.createdAt || ''}</span>
             </div>
           </div>
         `;
@@ -2851,14 +3189,63 @@ async function handleRealGoogleTokenSuccess(accessToken) {
     if (!res.ok) throw new Error('Gagal mengambil profil Google');
     const profile = await res.json();
 
-    // Setelah user memilih akun asli & menyetujui kebijakan di pop-up Google,
-    // langsung buka Tahap 3: Mengisi Nama Saja!
+    const defaultName = profile.name || profile.given_name || (profile.email ? profile.email.split('@')[0] : 'User');
+    const email = profile.email || '';
+    const picture = profile.picture || '';
+    const deviceLabel = getDetectedDeviceName();
+
+    const isSameOwner =
+      state.googleAccount &&
+      state.googleAccount.folderOwnerEmail &&
+      state.googleAccount.folderOwnerEmail.toLowerCase() === email.toLowerCase();
+
+    // Langsung simpan akun Google & Token Drive begitu OAuth berhasil agar folder Drive langsung terbuat otomatis
+    state.googleAccount = {
+      name: defaultName,
+      email,
+      picture,
+      accessToken: accessToken || '',
+      accessTokenExpiresAt: Date.now() + 3300 * 1000,
+      driveFolderId: isSameOwner ? state.googleAccount.driveFolderId || '' : '',
+      folderOwnerEmail: isSameOwner ? email : '',
+      deviceLabel,
+      autoBackup: true,
+      connectedAt: new Date().toLocaleString(getActiveLocale())
+    };
+
+    const existsIdx = state.deviceGoogleAccounts.findIndex(
+      (a) => a.email && a.email.toLowerCase() === email.toLowerCase()
+    );
+    if (existsIdx === -1) {
+      state.deviceGoogleAccounts.unshift({ name: defaultName, email, picture, deviceLabel });
+    } else {
+      state.deviceGoogleAccounts[existsIdx] = { name: defaultName, email, picture, deviceLabel };
+    }
+
+    saveGoogleAccountToStorage();
+    saveDeviceGoogleAccountsToStorage();
+    setPendingDriveSync(true);
+    renderSettingsSection();
+    if (window.lucide) window.lucide.createIcons();
+
+    // Langsung buat folder & sinkronisasi otomatis di belakang layar begitu OAuth selesai
+    (async () => {
+      if (state.transactions.length === 0) {
+        const driveSnapshot = await fetchLatestBackupFromRealGoogleDrive(accessToken);
+        if (driveSnapshot && driveSnapshot.transactions && driveSnapshot.transactions.length > 0) {
+          restoreFromSnapshotObject(driveSnapshot);
+        }
+      }
+      runBackgroundDriveBackup(false);
+    })();
+
+    // Tampilkan Tahap 3: Konfirmasi Nama / Pop-Up Selamat Datang
     googleOAuthFlowState = {
       step: 3,
-      selectedEmail: profile.email || '',
-      selectedDefaultName: profile.name || profile.given_name || '',
-      selectedPicture: profile.picture || '',
-      enteredName: profile.name || profile.given_name || '',
+      selectedEmail: email,
+      selectedDefaultName: defaultName,
+      selectedPicture: picture,
+      enteredName: defaultName,
       showOtherAccountInput: false,
       showClientIdConfig: false
     };
@@ -3382,14 +3769,20 @@ function handleGoogleStep3ConfirmName(event) {
   const picture = googleOAuthFlowState.selectedPicture || '';
   const deviceLabel = getDetectedDeviceName();
 
+  const isSameOwner =
+    state.googleAccount &&
+    state.googleAccount.folderOwnerEmail &&
+    state.googleAccount.folderOwnerEmail.toLowerCase() === email.toLowerCase();
+
   // Simpan akun Google yang telah terhubung beserta nama yang dimasukkan
   state.googleAccount = {
     name: enteredName,
     email,
     picture,
-    accessToken: latestGoogleAccessToken || '',
-    accessTokenExpiresAt: latestGoogleAccessToken ? Date.now() + 3300 * 1000 : 0,
-    driveFolderId: (state.googleAccount && state.googleAccount.driveFolderId) || '',
+    accessToken: latestGoogleAccessToken || (state.googleAccount && state.googleAccount.accessToken) || '',
+    accessTokenExpiresAt: latestGoogleAccessToken ? Date.now() + 3300 * 1000 : (state.googleAccount && state.googleAccount.accessTokenExpiresAt) || 0,
+    driveFolderId: isSameOwner ? state.googleAccount.driveFolderId || '' : '',
+    folderOwnerEmail: isSameOwner ? email : '',
     deviceLabel,
     autoBackup: true,
     connectedAt: new Date().toLocaleString(getActiveLocale())
@@ -3451,6 +3844,41 @@ async function finishGoogleWelcomePopup() {
 }
 
 const DRIVE_MAIN_FOLDER_NAME = 'FinanceTracker - Cadangan Transaksi';
+const driveFolderPermCache = new Set();
+
+/**
+ * Memberikan izin baca via tautan (Anyone with the link) pada folder cadangan Google Drive
+ * agar saat tombol "Buka Folder Drive" diklik di browser yang memiliki banyak akun Google (multi-session),
+ * Google Drive tidak pernah memblokir dengan halaman 404.
+ */
+async function ensureDriveFolderLinkPermission(accessToken, folderId) {
+  if (!accessToken || !folderId) return false;
+  if (driveFolderPermCache.has(folderId)) return true;
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${folderId}/permissions`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json; charset=UTF-8'
+        },
+        body: JSON.stringify({
+          role: 'reader',
+          type: 'anyone'
+        })
+      }
+    );
+    if (res.ok) {
+      driveFolderPermCache.add(folderId);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.warn('Error ensureDriveFolderLinkPermission:', e);
+    return false;
+  }
+}
 
 /**
  * Mencari atau membuat folder di Google Drive agar file cadangan tersusun rapi di dalam folder.
@@ -3475,10 +3903,21 @@ async function getOrCreateGoogleDriveFolder(accessToken, folderName, parentFolde
       return 'TOKEN_EXPIRED';
     }
 
+    if (searchRes.status === 403) {
+      const errData = await searchRes.json().catch(() => ({}));
+      const errMsg = (errData && errData.error && errData.error.message) || '';
+      if (errMsg.includes('has not been used in project') || errMsg.includes('is disabled')) {
+        return 'DRIVE_API_DISABLED';
+      }
+      return 'DRIVE_PERMISSION_DENIED';
+    }
+
     if (searchRes.ok) {
       const searchData = await searchRes.json();
       if (searchData.files && searchData.files.length > 0) {
-        return searchData.files[0].id;
+        const existingId = searchData.files[0].id;
+        await ensureDriveFolderLinkPermission(accessToken, existingId);
+        return existingId;
       }
     }
 
@@ -3501,9 +3940,23 @@ async function getOrCreateGoogleDriveFolder(accessToken, folderName, parentFolde
       body: JSON.stringify(folderMetadata)
     });
 
+    if (createRes.status === 401) return 'TOKEN_EXPIRED';
+    if (createRes.status === 403) {
+      const errData = await createRes.json().catch(() => ({}));
+      const errMsg = (errData && errData.error && errData.error.message) || '';
+      if (errMsg.includes('has not been used in project') || errMsg.includes('is disabled')) {
+        return 'DRIVE_API_DISABLED';
+      }
+      return 'DRIVE_PERMISSION_DENIED';
+    }
+
     if (!createRes.ok) return null;
     const createdFolder = await createRes.json();
-    return createdFolder.id || null;
+    if (createdFolder && createdFolder.id) {
+      await ensureDriveFolderLinkPermission(accessToken, createdFolder.id);
+      return createdFolder.id;
+    }
+    return null;
   } catch (e) {
     console.warn('Error getOrCreateGoogleDriveFolder:', e);
     return null;
@@ -3625,8 +4078,12 @@ async function uploadBackupToRealGoogleDrive(accessToken, fileName, payloadObj, 
       null
     );
 
-    if (mainFolderId === 'TOKEN_EXPIRED') {
-      return { error: 'TOKEN_EXPIRED' };
+    if (
+      mainFolderId === 'TOKEN_EXPIRED' ||
+      mainFolderId === 'DRIVE_API_DISABLED' ||
+      mainFolderId === 'DRIVE_PERMISSION_DENIED'
+    ) {
+      return { error: mainFolderId };
     }
 
     // 2. Pastikan Sub-Folder Periode Bulan (misal "2026-09") ada di dalam Folder Utama
@@ -3714,6 +4171,7 @@ function closeGoogleAuthModal() {
 function disconnectGoogleAccount() {
   latestGoogleAccessToken = '';
   state.googleAccount = null;
+  setPendingDriveSync(false);
   saveGoogleAccountToStorage();
   renderSettingsSection();
   if (window.lucide) window.lucide.createIcons();
@@ -3755,9 +4213,25 @@ function buildFullTransactionBackupPayload() {
 
 /**
  * Menjalankan sinkronisasi cadangan transaksi ke folder Google Drive di belakang layar (Background Sync)
+ * Jika sedang offline, maka menandai antrean (pending sync) dan otomatis mencadangkan saat internet kembali menyala.
  */
 function runBackgroundDriveBackup(isSilentAuto = false) {
   if (!state.googleAccount || !state.googleAccount.email) return;
+
+  const payload = buildFullTransactionBackupPayload();
+  saveCloudSnapshotForEmail(state.googleAccount.email, payload);
+
+  // Jika sedang tidak terhubung ke internet (Offline), simpan antrean agar otomatis dicadangkan saat kembali Online
+  if (navigator.onLine === false) {
+    setPendingDriveSync(true);
+    renderSettingsSection();
+    if (window.lucide) window.lucide.createIcons();
+    if (!isSilentAuto) {
+      showToast('Perangkat sedang offline. Cadangan akan otomatis diunggah ke Google Drive saat internet terhubung.');
+    }
+    return;
+  }
+
   if (state.isSyncingBackground) return;
 
   state.isSyncingBackground = true;
@@ -3779,12 +4253,9 @@ function runBackgroundDriveBackup(isSilentAuto = false) {
     }
     if (pctText) pctText.textContent = '70%';
     if (barEl) barEl.style.width = '70%';
-  }, 450);
+  }, 350);
 
   setTimeout(async () => {
-    const payload = buildFullTransactionBackupPayload();
-    saveCloudSnapshotForEmail(state.googleAccount.email, payload);
-
     const todayISO = getTodayLocalISO(); // YYYY-MM-DD
     const monthFolder = todayISO.slice(0, 7); // YYYY-MM
     const folderPath = `${DRIVE_MAIN_FOLDER_NAME} / ${monthFolder}`;
@@ -3795,6 +4266,7 @@ function runBackgroundDriveBackup(isSilentAuto = false) {
     let driveResult = null;
     if (activeToken) {
       driveResult = await uploadBackupToRealGoogleDrive(activeToken, fileName, payload, monthFolder);
+
       if (driveResult && driveResult.error === 'TOKEN_EXPIRED') {
         latestGoogleAccessToken = '';
         if (state.googleAccount) {
@@ -3802,18 +4274,46 @@ function runBackgroundDriveBackup(isSilentAuto = false) {
           state.googleAccount.accessTokenExpiresAt = 0;
           saveGoogleAccountToStorage();
         }
+        setPendingDriveSync(true);
         state.isSyncingBackground = false;
         if (syncBox) syncBox.classList.add('hidden');
-        if (!isSilentAuto) {
-          showToast('Sesi Google Drive kedaluwarsa. Klik "Cadangkan Transaksi Anda" sekali lagi untuk menyambung ulang.');
-        }
+        renderSettingsSection();
+        return;
+      }
+
+      if (driveResult && driveResult.error === 'DRIVE_API_DISABLED') {
+        setPendingDriveSync(true);
+        state.isSyncingBackground = false;
+        if (syncBox) syncBox.classList.add('hidden');
+        showToast(
+          'Google Drive API belum diaktifkan di Google Cloud Console Anda (APIs & Services -> Enable Google Drive API).',
+          'error'
+        );
+        return;
+      }
+
+      if (driveResult && driveResult.error === 'DRIVE_PERMISSION_DENIED') {
+        setPendingDriveSync(true);
+        state.isSyncingBackground = false;
+        if (syncBox) syncBox.classList.add('hidden');
+        showToast(
+          'Izin akses Google Drive belum dicentang saat login. Silakan klik Ganti Akun lalu centang kotak izin Google Drive.',
+          'error'
+        );
         return;
       }
 
       if (driveResult && driveResult.mainFolderId && state.googleAccount) {
         state.googleAccount.driveFolderId = driveResult.mainFolderId;
+        state.googleAccount.folderOwnerEmail = state.googleAccount.email;
+        state.googleAccount.driveFolderPublic = true;
         saveGoogleAccountToStorage();
       }
+      if (driveResult && driveResult.dailyFile) {
+        setPendingDriveSync(false);
+      }
+    } else {
+      setPendingDriveSync(true);
     }
 
     const nowFormatted = new Date().toLocaleString(getActiveLocale(), {
@@ -3824,15 +4324,21 @@ function runBackgroundDriveBackup(isSilentAuto = false) {
       minute: '2-digit'
     });
 
-    const driveFolderUrl =
+    const resolvedFolderId =
       driveResult && (driveResult.monthFolderId || driveResult.mainFolderId)
-        ? `https://drive.google.com/drive/folders/${driveResult.monthFolderId || driveResult.mainFolderId}`
-        : state.googleAccount && state.googleAccount.driveFolderId
-        ? `https://drive.google.com/drive/folders/${state.googleAccount.driveFolderId}`
-        : 'https://drive.google.com/drive/my-drive';
+        ? driveResult.monthFolderId || driveResult.mainFolderId
+        : state.googleAccount &&
+          state.googleAccount.folderOwnerEmail &&
+          state.googleAccount.folderOwnerEmail.toLowerCase() ===
+            state.googleAccount.email.toLowerCase()
+        ? state.googleAccount.driveFolderId
+        : '';
+
+    const driveFolderUrl = buildSafeDriveFolderUrl(resolvedFolderId, state.googleAccount.email);
 
     const newEntry = {
       id: 'bk_' + Date.now(),
+      folderId: resolvedFolderId,
       folderPath,
       driveFolderUrl,
       fileName,
@@ -3843,7 +4349,6 @@ function runBackgroundDriveBackup(isSilentAuto = false) {
       payload
     };
 
-    // Jika sudah ada cadangan di hari & akun yang sama, perbarui entri tersebut agar rapi (1 hari = 1 file dalam folder bulan)
     const existingSameDayIdx = state.driveBackups.findIndex(
       (b) =>
         b.fileName === fileName &&
@@ -3881,17 +4386,23 @@ function runBackgroundDriveBackup(isSilentAuto = false) {
       if (!isSilentAuto) {
         showToast(`${t('bg_sync_done')} (${folderPath})`);
       }
-    }, 600);
-  }, 1050);
+    }, 500);
+  }, 650);
 }
 
 let autoBackupDebounceTimer = null;
 function triggerSilentAutoBackupIfConnected() {
   if (!state.googleAccount || !state.googleAccount.email) return;
+  if (navigator.onLine === false) {
+    setPendingDriveSync(true);
+    renderSettingsSection();
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
   if (autoBackupDebounceTimer) clearTimeout(autoBackupDebounceTimer);
   autoBackupDebounceTimer = setTimeout(() => {
     runBackgroundDriveBackup(true);
-  }, 400);
+  }, 350);
 }
 
 function restoreFromSnapshotObject(snapshot) {
@@ -6231,6 +6742,43 @@ function initApp() {
   }
 
   initPwaInstallButton();
+  initNetworkAutoSyncListener();
+}
+
+function initNetworkAutoSyncListener() {
+  window.addEventListener('online', () => {
+    renderSettingsSection();
+    if (window.lucide) window.lucide.createIcons();
+    if (
+      state.googleAccount &&
+      state.googleAccount.email &&
+      (hasPendingDriveSync() || !state.googleAccount.driveFolderId)
+    ) {
+      showToast('🌐 Terhubung ke internet! Mencadangkan transaksi otomatis ke Google Drive...', 'emerald');
+      runBackgroundDriveBackup(false);
+    }
+  });
+
+  window.addEventListener('offline', () => {
+    renderSettingsSection();
+    if (window.lucide) window.lucide.createIcons();
+  });
+
+  // Saat aplikasi dibuka dan sedang terhubung ke internet, otomatis sinkronkan jika ada antrean, folder belum terbuat, atau izin tautan folder belum diaktifkan
+  if (
+    navigator.onLine !== false &&
+    state.googleAccount &&
+    state.googleAccount.email &&
+    (hasPendingDriveSync() ||
+      !state.googleAccount.driveFolderId ||
+      !state.googleAccount.driveFolderPublic ||
+      !state.driveBackups ||
+      state.driveBackups.length === 0)
+  ) {
+    setTimeout(() => {
+      runBackgroundDriveBackup(true);
+    }, 500);
+  }
 }
 
 // ================= INSTALL APP (PWA / WEBAPK) =================
