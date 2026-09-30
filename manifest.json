@@ -1,13 +1,16 @@
 {
+  "id": "finance-tracker-app",
   "name": "FinanceTracker — Personal Financial Dashboard",
   "short_name": "FinanceTracker",
   "description": "Aplikasi pencatat keuangan pribadi dengan cadangan otomatis Google Drive, multi-bahasa, dan keamanan PIN/Pola/Biometrik.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#020617",
-  "theme_color": "#10b981",
-  "orientation": "portrait-primary",
+  "theme_color": "#020617",
+  "lang": "id-ID",
+  "categories": ["finance", "productivity"],
   "icons": [
     {
       "src": "icon-192.png",

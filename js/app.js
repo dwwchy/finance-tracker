@@ -487,20 +487,14 @@ function loadStateFromStorage() {
       }
     }
 
-    // Load Security Settings
-    const savedSec = localStorage.getItem(STORAGE_KEYS.SECURITY);
-    if (savedSec) {
-      const parsedSec = JSON.parse(savedSec);
-      state.security = {
-        enabled: Boolean(parsedSec.enabled && parsedSec.method && parsedSec.secret),
-        method: parsedSec.method || null,
-        secret: parsedSec.secret || '',
-        updatedAt: parsedSec.updatedAt || null
-      };
-      if (state.security.enabled) {
-        state.isAppLocked = true;
-      }
-    }
+    // Fitur Kata Sandi & Keamanan dinonaktifkan sesuai permintaan
+    state.security = {
+      enabled: false,
+      method: null,
+      secret: '',
+      updatedAt: null
+    };
+    state.isAppLocked = false;
 
     const now = getCurrentDateInfo(state.language);
     const savedMeta = localStorage.getItem(STORAGE_KEYS.META);
@@ -2480,7 +2474,7 @@ function renderSettingsSection() {
               <path fill="#FBBC05" d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"/>
               <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"/>
             </svg>
-            <span style="color:#1e293b !important; font-weight:700;">${t('btn_continue_with_google')}</span>
+            <span style="color:#1e293b !important; font-weight:700;">Continue with Google</span>
           </button>
         </div>
       `;
@@ -6235,6 +6229,78 @@ function initApp() {
   if (state.isAppLocked && state.security && state.security.enabled) {
     renderAppLockOverlay();
   }
+
+  initPwaInstallButton();
+}
+
+// ================= INSTALL APP (PWA / WEBAPK) =================
+
+let deferredPwaPrompt = null;
+
+function isRunningStandaloneApp() {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true
+  );
+}
+
+function updatePwaInstallButtonsVisibility(show) {
+  document.querySelectorAll('.btn-install-pwa').forEach((btn) => {
+    if (show && !isRunningStandaloneApp()) {
+      btn.classList.remove('hidden');
+    } else {
+      btn.classList.add('hidden');
+    }
+  });
+}
+
+function initPwaInstallButton() {
+  if (isRunningStandaloneApp()) {
+    updatePwaInstallButtonsVisibility(false);
+    return;
+  }
+  // Tampilkan tombol Install App selama dibuka di tab browser biasa
+  updatePwaInstallButtonsVisibility(true);
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPwaPrompt = e;
+  updatePwaInstallButtonsVisibility(true);
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredPwaPrompt = null;
+  updatePwaInstallButtonsVisibility(false);
+  if (typeof showToast === 'function') {
+    showToast('Aplikasi FinanceTracker berhasil di-install di perangkat Anda!', 'emerald');
+  }
+});
+
+async function installPwaApp() {
+  if (deferredPwaPrompt) {
+    deferredPwaPrompt.prompt();
+    const choiceResult = await deferredPwaPrompt.userChoice;
+    deferredPwaPrompt = null;
+    if (choiceResult && choiceResult.outcome === 'accepted') {
+      updatePwaInstallButtonsVisibility(false);
+    }
+    return;
+  }
+
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  if (isIOS) {
+    showToast(
+      'Untuk install di iPhone/iPad: Ketuk ikon Share (kotak panah atas) di bawah Safari lalu pilih "Add to Home Screen / Tambah ke Layar Utama".',
+      'emerald'
+    );
+  } else {
+    showToast(
+      'Untuk meng-install aplikasi: Ketuk ikon Titik Tiga (⋮) di pojok kanan atas Chrome lalu pilih "Instal aplikasi / Tambahkan ke Layar Utama".',
+      'emerald'
+    );
+  }
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
+
