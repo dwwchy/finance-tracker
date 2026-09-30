@@ -1,0 +1,1745 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#10b981" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Finance Tracker — Personal Financial Dashboard</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <!-- jsPDF & AutoTable CDN (Untuk Download Laporan PDF Langsung) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+
+  <!-- Google Identity Services CDN -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/styles.css?v=11" />
+</head>
+<body class="antialiased selection:bg-emerald-500 selection:text-slate-950 pb-24 md:pb-10">
+
+  <!-- ================= TOP NAVIGATION & FILTER BAR ================= -->
+  <header class="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-xl">
+    <div class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3">
+      
+      <!-- Baris 1: Brand & Filter Periode -->
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5">
+        
+        <!-- Brand Identity & Pojok Kanan Atas Mobile -->
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 border border-emerald-400/30 shrink-0">
+              <i data-lucide="wallet" class="w-4 h-4 sm:w-5 sm:h-5 text-slate-950 stroke-[2.3]"></i>
+            </div>
+            <div class="min-w-0">
+              <div class="flex items-center gap-2">
+                <h1 class="text-base sm:text-xl font-extrabold tracking-tight text-white whitespace-nowrap">
+                  Finance<span class="text-emerald-400">Tracker</span>
+                </h1>
+                <span
+                  id="activePeriodBadge"
+                  class="hidden sm:inline-flex items-center px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap"
+                ></span>
+              </div>
+              <div class="flex items-center gap-1.5 mt-0.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                <p id="liveTodayBadge" class="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pojok Kanan Atas Mobile: Monthly Budget & Pengaturan -->
+          <div class="flex md:hidden items-center gap-1 shrink-0">
+            <button
+              onclick="openBudgetModal()"
+              class="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-emerald-400 active:bg-slate-800 text-[10px] font-bold whitespace-nowrap"
+              title="Monthly Budget"
+            >
+              <i data-lucide="pie-chart" class="w-3.5 h-3.5 shrink-0"></i>
+              <span data-i18n="btn_budget_short">Budget</span>
+            </button>
+            <button
+              onclick="switchTab('settings')"
+              data-tab-target="settings"
+              class="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-emerald-400 active:bg-slate-800 transition-colors"
+              title="Pengaturan"
+            >
+              <i data-lucide="settings" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Bulan, Tahun & Pojok Kanan Atas Desktop -->
+        <div class="flex flex-wrap items-center justify-between lg:justify-end gap-2">
+          <!-- Navigasi Bulan & Tahun -->
+          <div class="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
+            <button
+              id="btnPrevPeriod"
+              onclick="navigatePeriod(-1)"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 border border-slate-800 transition-all shrink-0"
+              title="Periode Sebelumnya"
+            >
+              <i data-lucide="chevron-left" class="w-4 h-4"></i>
+            </button>
+
+            <!-- Dropdown Bulan -->
+            <div id="filterMonthContainer" class="flex-1 sm:flex-initial min-w-[124px] sm:min-w-[145px] flex items-center bg-slate-900/95 border border-slate-700/80 rounded-xl px-2.5 py-1.5 gap-1.5 transition-all">
+              <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+              <select
+                id="filterMonth"
+                data-custom-select="month-grid"
+                class="w-full bg-slate-900 text-xs font-semibold text-slate-100 focus:outline-none"
+              ></select>
+            </div>
+
+            <!-- Dropdown Tahun -->
+            <div id="filterYearContainer" class="min-w-[68px] flex items-center justify-center bg-slate-900/95 border border-slate-700/80 rounded-xl px-2.5 py-1.5 gap-1 shrink-0 transition-all">
+              <select
+                id="filterYear"
+                data-custom-select="compact"
+                class="bg-slate-900 text-xs font-semibold text-slate-100 focus:outline-none"
+              ></select>
+            </div>
+
+            <button
+              id="btnNextPeriod"
+              onclick="navigatePeriod(1)"
+              class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 border border-slate-800 transition-all shrink-0"
+              title="Periode Berikutnya"
+            >
+              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Tombol Pojok Kanan Atas Desktop -->
+          <div class="hidden md:flex items-center gap-1.5">
+            <button
+              onclick="openTransactionModal()"
+              class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/25 transition-all"
+            >
+              <i data-lucide="plus-circle" class="w-3.5 h-3.5 stroke-[2.5]"></i>
+              <span data-i18n="btn_add_tx">Tambah Transaksi</span>
+            </button>
+
+            <button
+              onclick="openBudgetModal()"
+              class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-emerald-400 border border-slate-800 transition-all"
+              title="Monthly Budget"
+            >
+              <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span data-i18n="btn_monthly_budget">Monthly Budget</span>
+            </button>
+
+            <button
+              onclick="switchTab('settings')"
+              data-tab-target="settings"
+              class="inline-flex items-center gap-1.5 px-2.5 py-2 rounded-xl text-[11px] font-semibold bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-emerald-400 border border-slate-800 transition-all"
+              title="Pengaturan"
+            >
+              <i data-lucide="settings" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span data-i18n="nav_settings">Pengaturan</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Baris 2: Desktop Tab Navigation Bar -->
+      <nav class="hidden md:flex items-center gap-1.5 mt-3 pt-2.5 border-t border-slate-800/70 overflow-x-auto" aria-label="Menu Tab Utama">
+        <button onclick="switchTab('dashboard')" data-tab-target="dashboard" class="desktop-tab-btn active-tab-dashboard">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span data-i18n="nav_dashboard">Dashboard</span>
+        </button>
+        <button onclick="switchTab('wallets')" data-tab-target="wallets" class="desktop-tab-btn">
+          <i data-lucide="wallet-cards" class="w-4 h-4 text-purple-400"></i>
+          <span data-i18n="nav_wallets">Wallet</span>
+        </button>
+        <button onclick="switchTab('income')" data-tab-target="income" class="desktop-tab-btn">
+          <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+          <span data-i18n="nav_income">Income</span>
+        </button>
+        <button onclick="switchTab('expense')" data-tab-target="expense" class="desktop-tab-btn">
+          <i data-lucide="trending-down" class="w-4 h-4 text-rose-400"></i>
+          <span data-i18n="nav_expense">Expenses</span>
+        </button>
+        <button onclick="switchTab('savings')" data-tab-target="savings" class="desktop-tab-btn">
+          <i data-lucide="piggy-bank" class="w-4 h-4 text-blue-400"></i>
+          <span data-i18n="nav_savings">Savings</span>
+        </button>
+        <button onclick="switchTab('history')" data-tab-target="history" class="desktop-tab-btn">
+          <i data-lucide="history" class="w-4 h-4 text-slate-400"></i>
+          <span data-i18n="nav_history">Riwayat Transaksi</span>
+        </button>
+        <button onclick="switchTab('settings')" data-tab-target="settings" class="desktop-tab-btn">
+          <i data-lucide="settings" class="w-4 h-4 text-teal-400"></i>
+          <span data-i18n="nav_settings">Pengaturan</span>
+        </button>
+      </nav>
+
+    </div>
+  </header>
+
+  <!-- ================= MAIN CONTENT CONTAINER ================= -->
+  <main class="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-4 sm:py-5">
+
+    <!-- =======================================================================
+         TAB 1: DASHBOARD (4 CARDS UKURAN SAMA PERSIS + "..." JIKA LEBIH)
+         ======================================================================= -->
+    <div id="tabSection-dashboard" class="tab-section space-y-5">
+
+      <!-- 4 HEADER SUMMARY CARDS -->
+      <section aria-label="Ringkasan Keuangan Utama">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 items-stretch">
+
+          <!-- Card 1: Total Income -->
+          <div onclick="switchTab('income')" class="rounded-2xl p-3.5 sm:p-4 card-income cursor-pointer flex flex-col justify-start h-[154px] sm:h-[178px] overflow-hidden">
+            <div>
+              <div class="flex items-center justify-between mb-1 sm:mb-1.5">
+                <span data-i18n="card_total_income" class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-emerald-300/90 truncate">
+                  Total Income
+                </span>
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <i data-lucide="trending-up" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                </div>
+              </div>
+              <div id="cardTotalIncome" class="text-base sm:text-2xl font-extrabold text-white font-mono-num tracking-tight mb-2 truncate">
+                Rp 0
+              </div>
+            </div>
+            <div id="cardIncomeSub" class="space-y-1 pt-2 border-t border-emerald-500/20 overflow-hidden"></div>
+          </div>
+
+          <!-- Card 2: Total Expenses -->
+          <div onclick="switchTab('expense')" class="rounded-2xl p-3.5 sm:p-4 card-expense cursor-pointer flex flex-col justify-start h-[154px] sm:h-[178px] overflow-hidden">
+            <div>
+              <div class="flex items-center justify-between mb-1 sm:mb-1.5">
+                <span data-i18n="card_total_expense" class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-rose-300/90 truncate">
+                  Total Expenses
+                </span>
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+                  <i data-lucide="trending-down" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                </div>
+              </div>
+              <div id="cardTotalExpense" class="text-base sm:text-2xl font-extrabold text-white font-mono-num tracking-tight mb-2 truncate">
+                Rp 0
+              </div>
+            </div>
+            <div id="cardExpenseSub" class="space-y-1 pt-2 border-t border-rose-500/20 overflow-hidden"></div>
+          </div>
+
+          <!-- Card 3: Total Savings -->
+          <div onclick="switchTab('savings')" class="rounded-2xl p-3.5 sm:p-4 card-savings cursor-pointer flex flex-col justify-start h-[154px] sm:h-[178px] overflow-hidden">
+            <div>
+              <div class="flex items-center justify-between mb-1 sm:mb-1.5">
+                <span data-i18n="card_total_savings" class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-blue-300/90 truncate">
+                  Total Savings
+                </span>
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <i data-lucide="piggy-bank" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                </div>
+              </div>
+              <div id="cardTotalSavings" class="text-base sm:text-2xl font-extrabold text-white font-mono-num tracking-tight mb-2 truncate">
+                Rp 0
+              </div>
+            </div>
+            <div id="cardSavingsSub" class="space-y-1 pt-2 border-t border-blue-500/20 overflow-hidden"></div>
+          </div>
+
+          <!-- Card 4: Total Balance -->
+          <div onclick="switchTab('wallets')" class="rounded-2xl p-3.5 sm:p-4 card-rate cursor-pointer flex flex-col justify-start h-[154px] sm:h-[178px] overflow-hidden">
+            <div>
+              <div class="flex items-center justify-between mb-1 sm:mb-1.5">
+                <span data-i18n="card_total_balance" class="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-teal-300/90 truncate">
+                  Total Balance
+                </span>
+                <div class="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-300 shrink-0">
+                  <i data-lucide="coins" class="w-3.5 h-3.5 sm:w-4 sm:h-4"></i>
+                </div>
+              </div>
+              <div id="cardSisaDana" class="text-base sm:text-2xl font-extrabold text-teal-300 font-mono-num tracking-tight mb-2 truncate">
+                Rp 0
+              </div>
+            </div>
+            <div id="cardSisaDanaSub" class="space-y-1 pt-2 border-t border-teal-500/20 overflow-hidden"></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- BAR RINGKASAN WALLET DI DASHBOARD -->
+      <section class="rounded-2xl p-3.5 sm:p-4 card-wallets">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
+              <i data-lucide="wallet-cards" class="w-4 h-4"></i>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <h3 data-i18n="nav_wallets" class="text-xs sm:text-sm font-bold text-white">Wallet</h3>
+              <span id="dashboardWalletTotal" class="text-xs sm:text-sm font-mono-num font-extrabold text-purple-300">Rp 0</span>
+            </div>
+          </div>
+          <button
+            onclick="switchTab('wallets')"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 transition-all shrink-0"
+          >
+            <i data-lucide="wallet" class="w-3.5 h-3.5"></i>
+            <span data-i18n="btn_open_wallet">Buka Wallet</span>
+          </button>
+        </div>
+        <div id="dashboardWalletChips" class="hidden flex-wrap items-center gap-2 mt-3 pt-3 border-t border-purple-500/20"></div>
+      </section>
+
+      <!-- ANALYTICS VISUAL -->
+      <section aria-label="Visualisasi Analitik Keuangan">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-1.5 h-5 rounded-full bg-emerald-500"></div>
+            <h2 data-i18n="sec_analytics" class="text-sm sm:text-base font-bold text-white">Analytics Visual</h2>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4">
+          <!-- Donut Chart 1: Top Spending -->
+          <div class="col-span-1 lg:col-span-4 glass-card rounded-2xl p-3 sm:p-5 flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+              <div class="min-w-0">
+                <h3 data-i18n="chart_top_spending" class="text-xs sm:text-sm font-bold text-slate-100 truncate">Top Spending</h3>
+                <p data-i18n="chart_top_spending_sub" class="text-[10px] sm:text-xs text-slate-400 truncate">Pos pengeluaran</p>
+              </div>
+              <span class="hidden sm:inline-flex p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                <i data-lucide="pie-chart" class="w-4 h-4"></i>
+              </span>
+            </div>
+            <div class="donut-chart-wrapper">
+              <canvas id="chartTopSpending"></canvas>
+            </div>
+          </div>
+
+          <!-- Donut Chart 2: Savings Distribution -->
+          <div class="col-span-1 lg:col-span-4 glass-card rounded-2xl p-3 sm:p-5 flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+              <div class="min-w-0">
+                <h3 data-i18n="chart_savings_dist" class="text-xs sm:text-sm font-bold text-slate-100 truncate">Savings Dist.</h3>
+                <p data-i18n="chart_savings_dist_sub" class="text-[10px] sm:text-xs text-slate-400 truncate">Alokasi tabungan</p>
+              </div>
+              <span class="hidden sm:inline-flex p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                <i data-lucide="target" class="w-4 h-4"></i>
+              </span>
+            </div>
+            <div class="donut-chart-wrapper">
+              <canvas id="chartSavingsDist"></canvas>
+            </div>
+          </div>
+
+          <!-- Grouped Bar Chart: Actual Spending vs Budget per Bulan -->
+          <div class="col-span-2 lg:col-span-4 glass-card rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-3 pb-2.5 border-b border-slate-800/80">
+              <div>
+                <h3 class="text-xs sm:text-sm font-bold text-slate-100">
+                  <span data-i18n="chart_actual_vs_budget">Actual vs Budget</span> (<span id="barChartYearLabel"></span>)
+                </h3>
+                <p data-i18n="chart_actual_vs_budget_sub" class="text-[10px] sm:text-xs text-slate-400 mt-0.5">Pengeluaran vs budget per bulan</p>
+              </div>
+              <div class="flex items-center gap-3 bg-slate-900/60 border border-slate-800 px-2.5 py-1.5 rounded-xl">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-sm bg-emerald-400 shadow-sm shadow-emerald-500/40"></span>
+                  <span data-i18n="chart_actual_label" class="text-[10px] sm:text-[11px] font-semibold text-slate-200">Actual</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-sm bg-slate-500/60 border border-slate-400/70"></span>
+                  <span data-i18n="chart_budget_label" class="text-[10px] sm:text-[11px] font-semibold text-slate-300">Budget</span>
+                </div>
+              </div>
+            </div>
+            <div class="relative flex-1 h-[185px] sm:h-[210px] w-full">
+              <canvas id="chartMonthlyBar"></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRANSAKSI TERBARU DI DASHBOARD -->
+      <section class="glass-card rounded-2xl p-4 sm:p-5">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-1.5 h-5 rounded-full bg-emerald-500"></div>
+            <h2 data-i18n="sec_recent_tx" class="text-sm sm:text-base font-bold text-white">Transaksi Terbaru</h2>
+          </div>
+          <button
+            onclick="switchTab('history')"
+            class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+          >
+            <span data-i18n="btn_view_all">Lihat Semua</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+        <div id="dashboardRecentTxList" class="space-y-2.5"></div>
+      </section>
+
+    </div>
+
+    <!-- =======================================================================
+         TAB WALLET
+         ======================================================================= -->
+    <div id="tabSection-wallets" class="tab-section hidden space-y-4">
+      <!-- Hero & 3-Column Summary Card -->
+      <div class="rounded-2xl p-4 sm:p-5 card-wallets space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span data-i18n="wallet_total_title" class="text-xs font-bold uppercase tracking-wider text-purple-300 whitespace-nowrap">
+                Total Saldo Wallet
+              </span>
+              <span
+                id="walletCountBadge"
+                class="px-2.5 py-0.5 rounded-full text-[10px] font-mono-num font-bold bg-purple-500/20 text-purple-200 border border-purple-500/30 whitespace-nowrap"
+              >
+                0 Wallet
+              </span>
+            </div>
+            <h2 id="walletTotalBalance" class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white tracking-tight">
+              Rp 0
+            </h2>
+            <p data-i18n="wallet_hero_desc" class="text-xs text-slate-300/85 leading-relaxed">
+              Pantau & kelola saldo rekening bank, dompet digital (E-Wallet), dan uang tunai Anda di satu tempat.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onclick="openAddWalletModal()"
+            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white keep-white shadow-lg shadow-purple-500/25 transition-all whitespace-nowrap shrink-0 focus:outline-none"
+          >
+            <i data-lucide="plus" class="w-4 h-4 stroke-[2.5]"></i>
+            <span data-i18n="btn_add_wallet">Tambah Wallet</span>
+          </button>
+        </div>
+
+        <!-- Baris Bawah: 3 Kartu Kategori Wallet -->
+        <div class="grid grid-cols-3 gap-2.5 sm:gap-3.5 pt-3.5 border-t border-purple-500/20">
+          <!-- Bank -->
+          <div
+            onclick="setWalletTypeFilter('Bank')"
+            class="cursor-pointer p-3 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-1.5"
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span data-i18n="wallet_cat_bank" class="text-xs font-bold text-slate-200 whitespace-nowrap">Bank</span>
+              <span id="walletPctBank" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-emerald-300">0%</span>
+            </div>
+            <div id="walletSumBank" class="text-xs sm:text-base font-extrabold font-mono-num text-emerald-400 truncate">
+              Rp 0
+            </div>
+            <div class="space-y-1.5 pt-0.5">
+              <span id="walletCountBank" class="block text-[10px] font-medium text-slate-400 whitespace-nowrap">0 Akun</span>
+              <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
+                <div id="walletBarBank" class="h-full rounded-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cash (Tunai) -->
+          <div
+            onclick="setWalletTypeFilter('Tunai')"
+            class="cursor-pointer p-3 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-1.5"
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span data-i18n="wallet_cat_cash" class="text-xs font-bold text-slate-200 whitespace-nowrap">Cash</span>
+              <span id="walletPctCash" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-amber-300">0%</span>
+            </div>
+            <div id="walletSumCash" class="text-xs sm:text-base font-extrabold font-mono-num text-amber-400 truncate">
+              Rp 0
+            </div>
+            <div class="space-y-1.5 pt-0.5">
+              <span id="walletCountCash" class="block text-[10px] font-medium text-slate-400 whitespace-nowrap">0 Akun</span>
+              <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
+                <div id="walletBarCash" class="h-full rounded-full bg-amber-400 transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- E-Wallet -->
+          <div
+            onclick="setWalletTypeFilter('E-Wallet')"
+            class="cursor-pointer p-3 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-1.5"
+          >
+            <div class="flex items-center justify-between gap-1">
+              <span data-i18n="wallet_cat_ewallet" class="text-xs font-bold text-slate-200 whitespace-nowrap">E-Wallet</span>
+              <span id="walletPctEwallet" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-cyan-300">0%</span>
+            </div>
+            <div id="walletSumEwallet" class="text-xs sm:text-base font-extrabold font-mono-num text-cyan-400 truncate">
+              Rp 0
+            </div>
+            <div class="space-y-1.5 pt-0.5">
+              <span id="walletCountEwallet" class="block text-[10px] font-medium text-slate-400 whitespace-nowrap">0 Akun</span>
+              <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
+                <div id="walletBarEwallet" class="h-full rounded-full bg-cyan-400 transition-all duration-500" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toolbar Filter Kategori Wallet -->
+      <div class="glass-card rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h3 data-i18n="wallet_list_title" class="text-xs sm:text-sm font-bold text-white">Daftar Penyimpanan Dana</h3>
+          <p data-i18n="wallet_list_desc" class="text-[11px] text-slate-400 mt-0.5">
+            Pilih kategori untuk menampilkan rincian saldo masing-masing wallet Anda.
+          </p>
+        </div>
+
+        <!-- Filter Pills -->
+        <div class="grid grid-cols-4 sm:flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800/80 shrink-0">
+          <button
+            type="button"
+            onclick="setWalletTypeFilter('ALL')"
+            data-wallet-filter="ALL"
+            data-i18n="filter_all"
+            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/35 transition-all text-center whitespace-nowrap focus:outline-none"
+          >
+            Semua
+          </button>
+          <button
+            type="button"
+            onclick="setWalletTypeFilter('Bank')"
+            data-wallet-filter="Bank"
+            data-i18n="wallet_cat_bank"
+            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition-all text-center whitespace-nowrap focus:outline-none"
+          >
+            Bank
+          </button>
+          <button
+            type="button"
+            onclick="setWalletTypeFilter('Tunai')"
+            data-wallet-filter="Tunai"
+            data-i18n="wallet_cat_cash"
+            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition-all text-center whitespace-nowrap focus:outline-none"
+          >
+            Cash
+          </button>
+          <button
+            type="button"
+            onclick="setWalletTypeFilter('E-Wallet')"
+            data-wallet-filter="E-Wallet"
+            data-i18n="wallet_cat_ewallet"
+            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition-all text-center whitespace-nowrap focus:outline-none"
+          >
+            E-Wallet
+          </button>
+        </div>
+      </div>
+
+      <!-- Grid Daftar Kartu Wallet -->
+      <div id="walletsGridContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"></div>
+    </div>
+
+    <!-- =======================================================================
+         TAB INCOME BREAKDOWN
+         ======================================================================= -->
+    <div id="tabSection-income" class="tab-section hidden space-y-5">
+      <div class="rounded-2xl p-4 sm:p-5 card-income flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+        <div>
+          <span data-i18n="income_tab_title" class="text-xs font-bold uppercase tracking-wider text-emerald-300">Tab Pemasukan (Income)</span>
+          <div class="flex items-baseline gap-3 mt-1">
+            <h2 id="tabBannerIncomeTotal" class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white">Rp 0</h2>
+            <span data-i18n="income_tab_sub" class="text-xs text-emerald-200/80">Total dana masuk</span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
+          <button
+            onclick="openAddCategoryModal('Income')"
+            class="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 border border-emerald-400/35 whitespace-nowrap"
+          >
+            <i data-lucide="folder-plus" class="w-3.5 h-3.5 shrink-0"></i>
+            <span data-i18n="btn_new_source">+ Sumber Baru</span>
+          </button>
+          <button
+            onclick="openQuickAddModal('Income', 'Pendapatan Utama')"
+            class="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 whitespace-nowrap"
+          >
+            <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5] shrink-0"></i>
+            <span data-i18n="btn_add_income">Tambah Income</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="mobileCardsIncome" class="md:hidden space-y-2.5"></div>
+
+      <div class="hidden md:block glass-card rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse breakdown-table">
+            <thead>
+              <tr>
+                <th data-i18n="th_income_source" class="py-3 pl-4 pr-3">Sumber Dana Masuk</th>
+                <th data-i18n="th_income_share" class="py-3 px-3 text-center">Kontribusi (%)</th>
+                <th data-i18n="th_income_bar" class="py-3 px-4">Proporsi Dana Masuk</th>
+                <th class="py-3 pl-3 pr-4 text-right"><span data-i18n="th_income_total">Total Masuk</span> (<span data-currency-symbol>Rp</span>)</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyIncome"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         TAB EXPENSES BREAKDOWN
+         ======================================================================= -->
+    <div id="tabSection-expense" class="tab-section hidden space-y-5">
+      <div class="rounded-2xl p-4 sm:p-5 card-expense flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+        <div>
+          <span data-i18n="expense_tab_title" class="text-xs font-bold uppercase tracking-wider text-rose-300">Tab Pengeluaran (Expenses)</span>
+          <div class="flex items-baseline gap-3 mt-1">
+            <h2 id="tabBannerExpenseTotal" class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white">Rp 0</h2>
+            <span class="text-xs text-slate-300"><span data-i18n="expense_tab_from_budget">dari budget</span> <strong id="tabBannerExpenseBudget" class="font-mono-num">Rp 0</strong></span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
+          <button
+            onclick="openAddCategoryModal('Expense')"
+            class="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-400/35 whitespace-nowrap"
+          >
+            <i data-lucide="folder-plus" class="w-3.5 h-3.5 shrink-0"></i>
+            <span data-i18n="btn_new_category">+ Kategori Baru</span>
+          </button>
+          <button
+            onclick="openQuickAddModal('Expense', 'Transportasi')"
+            class="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-400 text-white keep-white shadow-lg shadow-rose-500/20 whitespace-nowrap"
+          >
+            <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5] shrink-0"></i>
+            <span data-i18n="btn_add_expense">Tambah Expense</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="mobileCardsExpense" class="md:hidden space-y-2.5"></div>
+
+      <div class="hidden md:block glass-card rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse breakdown-table">
+            <thead>
+              <tr>
+                <th data-i18n="th_category" class="py-3 pl-4 pr-3">Category</th>
+                <th class="py-3 px-3 text-right"><span data-i18n="th_tracked">Tracked</span> (<span data-currency-symbol>Rp</span>)</th>
+                <th class="py-3 px-3 text-right"><span data-i18n="th_budget">Budget</span> (<span data-currency-symbol>Rp</span>)</th>
+                <th data-i18n="th_usage_pct" class="py-3 px-3 text-center">% Usage</th>
+                <th data-i18n="th_visual_bar" class="py-3 px-4">Visual Progress Bar</th>
+                <th data-i18n="th_budget_left" class="py-3 px-3 text-right">Budget Left</th>
+                <th data-i18n="th_excess" class="py-3 pl-3 pr-4 text-right">Excess</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyExpense"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         TAB SAVINGS BREAKDOWN
+         ======================================================================= -->
+    <div id="tabSection-savings" class="tab-section hidden space-y-5">
+      <div class="rounded-2xl p-4 sm:p-5 card-savings flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+        <div>
+          <span data-i18n="savings_tab_title" class="text-xs font-bold uppercase tracking-wider text-blue-300">Tab Tabungan (Savings)</span>
+          <div class="flex items-baseline gap-3 mt-1">
+            <h2 id="tabBannerSavingsTotal" class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white">Rp 0</h2>
+            <span class="text-xs text-slate-300"><span data-i18n="savings_tab_target">Target terencana:</span> <strong id="tabBannerSavingsBudget" class="font-mono-num">Rp 0</strong></span>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:flex sm:flex-nowrap items-center gap-2 w-full sm:w-auto shrink-0">
+          <button
+            onclick="openAddCategoryModal('Savings')"
+            class="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl text-xs font-semibold bg-blue-500/20 hover:bg-blue-500/30 text-blue-200 border border-blue-400/40 whitespace-nowrap"
+          >
+            <i data-lucide="folder-plus" class="w-3.5 h-3.5 shrink-0"></i>
+            <span data-i18n="btn_new_category">+ Kategori Baru</span>
+          </button>
+          <button
+            onclick="openQuickAddModal('Savings', 'Dana Darurat')"
+            class="inline-flex items-center justify-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-bold bg-blue-500 hover:bg-blue-400 text-white keep-white shadow-lg shadow-blue-500/20 whitespace-nowrap"
+          >
+            <i data-lucide="plus" class="w-3.5 h-3.5 stroke-[2.5] shrink-0"></i>
+            <span data-i18n="btn_add_savings">Tambah Savings</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="mobileCardsSavings" class="md:hidden space-y-2.5"></div>
+
+      <div class="hidden md:block glass-card rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse breakdown-table">
+            <thead>
+              <tr>
+                <th data-i18n="th_category" class="py-3 pl-4 pr-3">Category</th>
+                <th class="py-3 px-3 text-right"><span data-i18n="th_tracked">Tracked</span> (<span data-currency-symbol>Rp</span>)</th>
+                <th class="py-3 px-3 text-right"><span data-i18n="th_budget">Budget</span> (<span data-currency-symbol>Rp</span>)</th>
+                <th data-i18n="th_usage_pct" class="py-3 px-3 text-center">% Usage</th>
+                <th data-i18n="th_visual_bar" class="py-3 px-4">Visual Progress Bar</th>
+                <th data-i18n="th_budget_left" class="py-3 px-3 text-right">Budget Left</th>
+                <th data-i18n="th_excess" class="py-3 pl-3 pr-4 text-right">Excess</th>
+              </tr>
+            </thead>
+            <tbody id="tbodySavings"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         TAB RIWAYAT TRANSAKSI LENGKAP
+         ======================================================================= -->
+    <div id="tabSection-history" class="tab-section hidden space-y-4">
+      <div class="glass-card rounded-2xl overflow-hidden">
+        <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-1.5 h-5 rounded-full bg-emerald-500"></div>
+              <h2 data-i18n="history_title" class="text-base font-bold text-white">Riwayat Transaksi</h2>
+              <span
+                id="txCountBadge"
+                class="px-2 py-0.5 rounded-full text-xs font-mono-num bg-slate-800 text-slate-300 border border-slate-700"
+              >
+                0 Transaksi
+              </span>
+            </div>
+
+            <button
+              onclick="clearAllFinanceData()"
+              class="md:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30"
+            >
+              <i data-lucide="trash-2" class="w-3 h-3"></i>
+              <span data-i18n="btn_reset_short">Reset</span>
+            </button>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="relative flex-1 sm:flex-initial">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input
+                id="txSearchInput"
+                type="text"
+                autocomplete="off"
+                placeholder="Cari kategori, wallet, catatan..."
+                class="w-full sm:w-56 pl-8 pr-3 py-1.5 rounded-xl text-xs input-dark"
+              />
+            </div>
+
+            <div class="min-w-[135px] flex items-center bg-slate-900/95 border border-slate-700/80 rounded-xl px-3 py-1.5">
+              <select
+                id="txTypeFilterSelect"
+                data-custom-select="compact"
+                class="w-full text-xs font-medium input-dark cursor-pointer"
+              >
+                <option value="ALL">Semua Tipe</option>
+                <option value="Income">Income</option>
+                <option value="Expense">Expense</option>
+                <option value="Savings">Savings</option>
+              </select>
+            </div>
+
+            <button
+              onclick="exportFilteredToCSV()"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+            >
+              <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>CSV</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="mobileTransactionsList" class="md:hidden p-3.5 space-y-2.5"></div>
+
+        <div class="hidden md:block overflow-x-auto">
+          <table class="w-full text-left border-collapse breakdown-table">
+            <thead>
+              <tr>
+                <th data-i18n="th_date" class="py-3 pl-4 pr-3">Tanggal</th>
+                <th data-i18n="th_type" class="py-3 px-3">Tipe</th>
+                <th data-i18n="th_cat_note" class="py-3 px-3">Kategori &amp; Catatan</th>
+                <th data-i18n="th_wallet" class="py-3 px-3">Wallet</th>
+                <th class="py-3 px-3 text-right"><span data-i18n="th_amount">Jumlah</span> (<span data-currency-symbol>Rp</span>)</th>
+                <th data-i18n="th_action" class="py-3 pl-3 pr-4 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tbodyTransactions"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- =======================================================================
+         TAB PENGATURAN LENGKAP:
+         - Dual Mode (Dark & Light)
+         - Format Mata Uang (Multi-Currency)
+         - Berbagai Macam Bahasa (Multi-Language)
+         - Pengaturan Kata Sandi (PIN, Pola, atau Sidik Jari)
+         - Cadangan Otomatis di Google ("Cadangkan Transaksi Anda" di belakang layar)
+         - Download Laporan PDF Langsung Otomatis (Tanpa perlu login Google)
+         ======================================================================= -->
+    <div id="tabSection-settings" class="tab-section hidden space-y-4">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+
+        <!-- ================= KOLOM KIRI (7 COL): PREFERENSI TAMPILAN, KEAMANAN & CADANGAN GOOGLE ================= -->
+        <div class="lg:col-span-7 space-y-4">
+
+          <!-- CARD 1: TAMPILAN DUAL MODE (DARK & LIGHT), FORMAT MATA UANG & BAHASA -->
+          <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-4">
+            <div class="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-800/70">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                  <i data-lucide="palette" class="w-4 h-4"></i>
+                </div>
+                <div class="min-w-0">
+                  <h2 data-i18n="settings_appearance_title" class="text-sm sm:text-base font-bold text-white truncate">Tampilan, Mata Uang &amp; Bahasa</h2>
+                  <p data-i18n="settings_appearance_desc" class="text-[11px] text-slate-400 truncate">Atur Dual Mode (Gelap/Terang), format mata uang, dan bahasa aplikasi</p>
+                </div>
+              </div>
+              <span id="activeThemeBadge" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/12 text-emerald-300 border border-emerald-500/25 shrink-0">
+                Dark
+              </span>
+            </div>
+
+            <!-- 1. Dual Mode (Dark & Light) dengan Opacity Lebih Halus -->
+            <div class="space-y-1.5">
+              <label data-i18n="settings_theme_label" class="block text-xs font-semibold text-slate-300">
+                Mode Tampilan (Dual Mode)
+              </label>
+              <div class="grid grid-cols-2 gap-2.5 p-1 rounded-2xl bg-slate-950/40 border border-slate-800/60">
+                <button
+                  type="button"
+                  id="btnThemeDark"
+                  onclick="setThemeMode('dark')"
+                  class="py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all"
+                >
+                  <i data-lucide="moon" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span data-i18n="theme_dark">Gelap</span>
+                </button>
+                <button
+                  type="button"
+                  id="btnThemeLight"
+                  onclick="setThemeMode('light')"
+                  class="py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all"
+                >
+                  <i data-lucide="sun" class="w-3.5 h-3.5 shrink-0"></i>
+                  <span data-i18n="theme_light">Terang</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 2. Format Mata Uang & 3. Pilihan Bahasa -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label for="settingsCurrencySelect" data-i18n="settings_currency_label" class="block text-xs font-semibold text-slate-300">
+                    Format Mata Uang
+                  </label>
+                  <span id="currencyPreviewBadge" class="text-[10px] font-mono-num font-bold text-emerald-400">Rp 1.500.000</span>
+                </div>
+                <select
+                  id="settingsCurrencySelect"
+                  data-custom-select="field"
+                  class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark cursor-pointer"
+                ></select>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-1.5">
+                  <label for="settingsLanguageSelect" data-i18n="settings_language_label" class="block text-xs font-semibold text-slate-300">
+                    Pilihan Bahasa
+                  </label>
+                  <span id="languageActiveFlagBadge" class="text-[11px] font-semibold text-slate-400">🇮🇩 ID</span>
+                </div>
+                <select
+                  id="settingsLanguageSelect"
+                  data-custom-select="field"
+                  class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark cursor-pointer"
+                ></select>
+              </div>
+            </div>
+          </div>
+
+          <!-- CARD 2: PENGATURAN KATA SANDI & KEAMANAN MINIMALIS (PIN, POLA, SIDIK JARI) -->
+          <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-3.5">
+            <div class="flex items-center justify-between gap-2 pb-3 border-b border-slate-800/70">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shrink-0">
+                  <i data-lucide="shield-check" class="w-4 h-4"></i>
+                </div>
+                <div class="min-w-0">
+                  <h2 data-i18n="settings_security_title" class="text-sm sm:text-base font-bold text-white truncate">Kata Sandi &amp; Keamanan</h2>
+                  <p data-i18n="settings_security_desc" class="text-[11px] text-slate-400 truncate">Kunci aplikasi dengan PIN, Pola, atau Sidik Jari perangkat</p>
+                </div>
+              </div>
+              <span id="securityStatusBadge" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800/70 text-slate-400 border border-slate-700/70 shrink-0">
+                Nonaktif
+              </span>
+            </div>
+
+            <!-- 3 Pilihan Minimalis (Logo + Tulisan Singkat: PIN, Pola, Sidik Jari) -->
+            <div class="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                id="btnSecMethodPin"
+                onclick="openSecuritySetupModal('pin')"
+                class="py-2.5 px-3 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/80 transition-all flex items-center justify-center gap-2 text-xs font-bold text-slate-100"
+              >
+                <i data-lucide="key-round" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                <span data-i18n="sec_method_pin" class="truncate">PIN</span>
+              </button>
+
+              <button
+                type="button"
+                id="btnSecMethodPattern"
+                onclick="openSecuritySetupModal('pattern')"
+                class="py-2.5 px-3 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/80 transition-all flex items-center justify-center gap-2 text-xs font-bold text-slate-100"
+              >
+                <i data-lucide="grid-3x3" class="w-4 h-4 text-purple-400 shrink-0"></i>
+                <span data-i18n="sec_method_pattern" class="truncate">Pola</span>
+              </button>
+
+              <button
+                type="button"
+                id="btnSecMethodFingerprint"
+                onclick="openSecuritySetupModal('fingerprint')"
+                class="py-2.5 px-3 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 border border-slate-800/80 transition-all flex items-center justify-center gap-2 text-xs font-bold text-slate-100"
+              >
+                <i data-lucide="fingerprint" class="w-4 h-4 text-blue-400 shrink-0"></i>
+                <span data-i18n="sec_method_fingerprint" class="truncate">Sidik Jari</span>
+              </button>
+            </div>
+
+            <!-- Kontrol Tambahan Saat Kata Sandi Aktif -->
+            <div id="securityActiveControlsArea" class="hidden"></div>
+          </div>
+
+        </div>
+
+        <!-- ================= KOLOM KANAN (5 COL): CADANGAN TRANSAKSI GOOGLE DRIVE & DOWNLOAD PDF LANGSUNG ================= -->
+        <div class="lg:col-span-5 space-y-4">
+
+          <!-- CARD 3: CADANGAN OTOMATIS DI GOOGLE ("CADANGKAN TRANSAKSI ANDA") -->
+          <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-4">
+            <div class="flex items-center justify-between gap-2 pb-3.5 border-b border-slate-800/70">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  <i data-lucide="cloud-upload" class="w-4 h-4"></i>
+                </div>
+                <div class="min-w-0">
+                  <h2 data-i18n="settings_backup_title" class="text-sm sm:text-base font-bold text-white truncate">Cadangan Otomatis di Google Drive</h2>
+                  <p data-i18n="settings_backup_desc" class="text-[11px] text-slate-400 truncate">Cadangkan berkas transaksi otomatis di belakang layar agar aman saat ganti perangkat</p>
+                </div>
+              </div>
+              <span id="driveAuthBadge" class="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800/70 text-slate-400 border border-slate-700/70 shrink-0">
+                Belum Login
+              </span>
+            </div>
+
+            <!-- Area Status Akun Google Perangkat -->
+            <div id="googleAccountCardArea"></div>
+
+            <!-- Indikator Proses Background Sync ke Google Drive -->
+            <div id="backgroundSyncStatusBox" class="hidden p-3 rounded-xl bg-blue-950/30 border border-blue-500/30 space-y-2">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <span class="flex items-center gap-2 font-bold text-blue-300">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5 animate-spin text-blue-400"></i>
+                  <span id="bgSyncStatusText" data-i18n="bg_sync_connecting">Menghubungkan ke Google Drive di belakang layar...</span>
+                </span>
+                <span id="bgSyncPercentText" class="font-mono-num text-[11px] font-bold text-emerald-400">0%</span>
+              </div>
+              <div class="w-full h-1.5 rounded-full progress-track overflow-hidden">
+                <div id="bgSyncProgressBar" class="h-full rounded-full bg-gradient-to-r from-blue-500 to-emerald-400 transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Tombol Utama: "Cadangkan Transaksi Anda" & "Pulihkan Cadangan" -->
+            <div class="space-y-2">
+              <button
+                type="button"
+                id="btnBackupTransactionsDrive"
+                onclick="handleBackupTransactionsClick()"
+                class="w-full py-3 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 bg-gradient-to-r from-blue-500 to-emerald-500 hover:from-blue-400 hover:to-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition-all"
+              >
+                <i data-lucide="cloud-cog" class="w-4 h-4 stroke-[2.3] shrink-0"></i>
+                <span data-i18n="btn_backup_transactions">Cadangkan Transaksi Anda</span>
+              </button>
+
+              <div class="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onclick="handleRestoreTransactionsFromDrive()"
+                  class="py-2 px-3 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 bg-slate-900/60 hover:bg-slate-800 text-slate-200 border border-slate-800/80 transition-all"
+                >
+                  <i data-lucide="cloud-download" class="w-3.5 h-3.5 text-blue-400 shrink-0"></i>
+                  <span data-i18n="btn_restore_transactions">Pulihkan Cadangan</span>
+                </button>
+
+                <button
+                  type="button"
+                  onclick="triggerImportBackupFile()"
+                  class="py-2 px-3 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 bg-slate-900/60 hover:bg-slate-800 text-slate-200 border border-slate-800/80 transition-all"
+                >
+                  <i data-lucide="folder-up" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+                  <span data-i18n="btn_import_backup">Impor Berkas Cadangan</span>
+                </button>
+                <input type="file" id="importBackupFileInput" accept=".json" class="hidden" />
+              </div>
+            </div>
+
+            <!-- Riwayat Cadangan Transaksi Google Drive -->
+            <div class="pt-3 border-t border-slate-800/70 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <i data-lucide="database-backup" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span data-i18n="backup_history_title">Riwayat Cadangan Transaksi</span>
+                </span>
+                <span id="driveBackupCountBadge" class="text-[10px] font-mono-num px-2 py-0.5 rounded-full bg-slate-800/70 text-slate-300 border border-slate-700/70">0 Cadangan</span>
+              </div>
+              <div id="driveBackupHistoryList" class="space-y-2"></div>
+            </div>
+          </div>
+
+          <!-- CARD 4: UNDUH LAPORAN PDF LANGSUNG (TANPA LOGIN) & MANAJEMEN DATA -->
+          <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-4">
+            <div class="flex items-center gap-2.5 pb-3.5 border-b border-slate-800/70">
+              <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+                <i data-lucide="file-down" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 data-i18n="settings_report_title" class="text-sm sm:text-base font-bold text-white">Unduh Laporan PDF &amp; Manajemen Data</h3>
+                <p data-i18n="settings_report_desc" class="text-[11px] text-slate-400">Download laporan PDF langsung otomatis tanpa login &amp; kelola berkas</p>
+              </div>
+            </div>
+
+            <div class="space-y-2">
+              <!-- Tombol Download Laporan PDF Langsung Otomatis -->
+              <button
+                type="button"
+                onclick="handleDownloadPdfReport()"
+                class="w-full py-3 px-4 rounded-xl text-xs font-extrabold flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition-all"
+              >
+                <i data-lucide="file-down" class="w-4 h-4 stroke-[2.3] shrink-0"></i>
+                <span data-i18n="btn_download_pdf_direct">Download Laporan (PDF)</span>
+              </button>
+
+              <button
+                type="button"
+                onclick="switchTab('history')"
+                class="w-full py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between bg-slate-900/60 hover:bg-slate-800 text-slate-200 border border-slate-800/80 transition-all"
+              >
+                <span class="flex items-center gap-2">
+                  <i data-lucide="history" class="w-4 h-4 text-emerald-400"></i>
+                  <span data-i18n="btn_full_history">Riwayat Transaksi Lengkap</span>
+                </span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+              </button>
+
+              <button
+                type="button"
+                onclick="exportFilteredToCSV()"
+                class="w-full py-2.5 px-3.5 rounded-xl text-xs font-semibold flex items-center justify-between bg-slate-900/60 hover:bg-slate-800 text-slate-200 border border-slate-800/80 transition-all"
+              >
+                <span class="flex items-center gap-2">
+                  <i data-lucide="file-spreadsheet" class="w-4 h-4 text-teal-400"></i>
+                  <span data-i18n="btn_export_csv">Ekspor Transaksi ke CSV</span>
+                </span>
+                <i data-lucide="download" class="w-4 h-4 text-slate-400"></i>
+              </button>
+
+              <button
+                type="button"
+                onclick="clearAllFinanceData()"
+                class="w-full py-2.5 px-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-all"
+              >
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                <span data-i18n="btn_clear_all">Kosongkan Semua Nominal</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ================= MOBILE BOTTOM NAVIGATION BAR ================= -->
+  <nav
+    class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-slate-950/90 backdrop-blur-xl border-t border-slate-800/80 mobile-bottom-nav"
+    aria-label="Navigasi Bawah Handphone"
+  >
+    <div class="grid grid-cols-6 items-center px-1 py-1">
+      <button onclick="switchTab('dashboard')" data-tab-target="dashboard" class="mobile-tab-btn">
+        <i data-lucide="layout-dashboard" class="w-4 h-4 mb-0.5"></i>
+        <span data-i18n="nav_home_mobile" class="text-[9px]">Home</span>
+      </button>
+
+      <button onclick="switchTab('wallets')" data-tab-target="wallets" class="mobile-tab-btn">
+        <i data-lucide="wallet-cards" class="w-4 h-4 mb-0.5"></i>
+        <span data-i18n="nav_wallets" class="text-[9px]">Wallet</span>
+      </button>
+
+      <button onclick="switchTab('income')" data-tab-target="income" class="mobile-tab-btn">
+        <i data-lucide="trending-up" class="w-4 h-4 mb-0.5"></i>
+        <span data-i18n="nav_income" class="text-[9px]">Income</span>
+      </button>
+
+      <button onclick="switchTab('expense')" data-tab-target="expense" class="mobile-tab-btn">
+        <i data-lucide="trending-down" class="w-4 h-4 mb-0.5"></i>
+        <span data-i18n="nav_expense" class="text-[9px]">Expense</span>
+      </button>
+
+      <button onclick="switchTab('savings')" data-tab-target="savings" class="mobile-tab-btn">
+        <i data-lucide="piggy-bank" class="w-4 h-4 mb-0.5"></i>
+        <span data-i18n="nav_savings" class="text-[9px]">Savings</span>
+      </button>
+
+      <div class="flex justify-center">
+        <button
+          onclick="openTransactionModal()"
+          class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 flex items-center justify-center shadow-md shadow-emerald-500/30 active:scale-95 transition-transform"
+          title="Catat Transaksi Baru"
+        >
+          <i data-lucide="plus" class="w-5 h-5 stroke-[2.8]"></i>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ================= MODAL 1: TAMBAH / EDIT TRANSAKSI ================= -->
+  <div
+    id="modalTransaction"
+    class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel max-h-[92vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <i data-lucide="receipt" class="w-4 h-4"></i>
+          </div>
+          <h3 id="modalTxTitle" data-i18n="btn_add_tx" class="text-base font-bold text-white">Tambah Transaksi</h3>
+        </div>
+        <button
+          type="button"
+          onclick="closeTransactionModal()"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Form -->
+      <form id="formTransaction" novalidate autocomplete="off" class="p-5 space-y-4 overflow-y-auto">
+        <input type="hidden" id="txType" value="Expense" />
+        <input type="hidden" id="txDate" />
+
+        <!-- Pilihan Tipe Transaksi -->
+        <div>
+          <label data-i18n="modal_tx_type_label" class="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+            Tipe Transaksi
+          </label>
+          <div class="flex items-center gap-2">
+            <button type="button" data-type="Income" data-i18n="nav_income" class="tx-type-btn">
+              Income
+            </button>
+            <button type="button" data-type="Expense" data-i18n="nav_expense" class="tx-type-btn">
+              Expense
+            </button>
+            <button type="button" data-type="Savings" data-i18n="nav_savings" class="tx-type-btn">
+              Savings
+            </button>
+          </div>
+        </div>
+
+        <!-- Kategori Pos Keuangan -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="txCategory" data-i18n="modal_tx_cat_label" class="block text-xs font-semibold text-slate-300">
+              Kategori
+            </label>
+            <button
+              type="button"
+              id="btnModalAddCustomCat"
+              class="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 inline-flex items-center gap-1"
+            >
+              <i data-lucide="plus-circle" class="w-3 h-3"></i>
+              <span data-i18n="modal_tx_add_custom_cat">Tambah Kategori Sendiri</span>
+            </button>
+          </div>
+          <select
+            id="txCategory"
+            data-custom-select="field"
+            class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark cursor-pointer"
+          ></select>
+        </div>
+
+        <!-- Jumlah Nominal -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="txAmount" class="block text-xs font-semibold text-slate-300">
+              <span data-i18n="modal_tx_amount_label">Jumlah</span> (<span data-currency-symbol>Rp</span>)
+            </label>
+            <span id="txAmountPreview" class="text-xs font-mono-num font-bold text-emerald-400">
+              Rp 0
+            </span>
+          </div>
+          <div class="relative">
+            <span data-currency-symbol class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono-num font-semibold text-slate-400">
+              Rp
+            </span>
+            <input
+              type="text"
+              id="txAmount"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="0"
+              class="w-full pl-11 pr-4 py-2.5 rounded-xl text-base font-mono-num input-dark"
+            />
+          </div>
+          <div id="txAmountError" class="hidden field-error-hint"></div>
+          <div id="txQuickAmountsContainer" class="flex flex-wrap items-center gap-1.5 mt-2">
+            <button type="button" onclick="addQuickAmount(25000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+25.000</button>
+            <button type="button" onclick="addQuickAmount(50000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+50.000</button>
+            <button type="button" onclick="addQuickAmount(100000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+100.000</button>
+            <button type="button" onclick="addQuickAmount(500000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+500.000</button>
+            <button type="button" onclick="addQuickAmount(1000000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+1.000.000</button>
+          </div>
+        </div>
+
+        <!-- Tanggal & Wallet -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div>
+            <label for="txDateLockedDisplay" data-i18n="modal_tx_date_label" class="block text-xs font-semibold text-slate-300 mb-1.5">
+              Tanggal
+            </label>
+            <input
+              type="text"
+              id="txDateLockedDisplay"
+              readonly
+              class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark select-none cursor-default"
+            />
+          </div>
+
+          <div>
+            <label for="txAccount" data-i18n="modal_tx_wallet_label" class="block text-xs font-semibold text-slate-300 mb-1.5">
+              Wallet
+            </label>
+            <select
+              id="txAccount"
+              data-custom-select="field"
+              class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark cursor-pointer"
+            ></select>
+          </div>
+        </div>
+
+        <!-- Catatan Tambahan -->
+        <div>
+          <label for="txNote" class="block text-xs font-semibold text-slate-300 mb-1.5">
+            <span data-i18n="modal_tx_note_label">Catatan</span> <span data-i18n="modal_tx_optional" class="text-slate-500 font-normal">(Opsional)</span>
+          </label>
+          <input
+            type="text"
+            id="txNote"
+            autocomplete="off"
+            placeholder="Tulis keterangan singkat..."
+            class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark"
+          />
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onclick="closeTransactionModal()"
+            data-i18n="btn_cancel"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            class="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition-all"
+          >
+            <i data-lucide="check" class="w-4 h-4 stroke-[2.5]"></i>
+            <span id="btnSubmitTxText" data-i18n="btn_save_tx">Simpan Transaksi</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 2: TAMBAH KATEGORI SENDIRI ================= -->
+  <div
+    id="modalAddCategory"
+    class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+            <i data-lucide="folder-plus" class="w-4 h-4"></i>
+          </div>
+          <h3 data-i18n="modal_cat_title" class="text-base font-bold text-white">Tambah Kategori Baru</h3>
+        </div>
+        <button
+          type="button"
+          onclick="closeAddCategoryModal()"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddCategory" novalidate autocomplete="off" class="p-5 space-y-4">
+        <div>
+          <label for="customCatType" data-i18n="modal_cat_group_label" class="block text-xs font-semibold text-slate-300 mb-1.5">
+            Kelompok Pos
+          </label>
+          <select
+            id="customCatType"
+            data-custom-select="field"
+            class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark cursor-pointer"
+          >
+            <option value="Savings">Savings (Tabungan)</option>
+            <option value="Expense">Expense (Pengeluaran)</option>
+            <option value="Income">Income (Pemasukan)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="customCatName" data-i18n="modal_cat_name_label" class="block text-xs font-semibold text-slate-300 mb-1.5">
+            Nama Kategori Baru
+          </label>
+          <input
+            type="text"
+            id="customCatName"
+            autocomplete="off"
+            placeholder="Contoh: Tabungan Rumah / Liburan / Gadget..."
+            class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark"
+          />
+          <div id="customCatNameError" class="hidden field-error-hint"></div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onclick="closeAddCategoryModal()"
+            data-i18n="btn_cancel"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950"
+          >
+            <i data-lucide="plus" class="w-4 h-4 stroke-[2.5]"></i>
+            <span data-i18n="btn_add">Tambahkan</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 3: ATUR SALDO WALLET ================= -->
+  <div
+    id="modalWalletBalance"
+    class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <i data-lucide="wallet-cards" class="w-4 h-4"></i>
+          </div>
+          <h3 id="walletBalanceModalTitle" data-i18n="modal_wallet_bal_title" class="text-base font-bold text-white">Atur Saldo Wallet</h3>
+        </div>
+        <button
+          type="button"
+          onclick="closeWalletBalanceModal()"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formWalletBalance" novalidate autocomplete="off" class="p-5 space-y-4">
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="walletBalanceInput" class="block text-xs font-semibold text-slate-300">
+              <span data-i18n="modal_wallet_bal_label">Saldo Saat Ini</span> (<span data-currency-symbol>Rp</span>)
+            </label>
+            <span id="walletBalancePreview" class="text-xs font-mono-num font-bold text-purple-300">
+              Rp 0
+            </span>
+          </div>
+          <div class="relative">
+            <span data-currency-symbol class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono-num font-semibold text-slate-400">
+              Rp
+            </span>
+            <input
+              type="text"
+              id="walletBalanceInput"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="0"
+              class="w-full pl-11 pr-4 py-2.5 rounded-xl text-base font-mono-num input-dark"
+            />
+          </div>
+          <div id="walletBalanceQuickAmounts" class="flex flex-wrap items-center gap-1.5 mt-2">
+            <button type="button" onclick="addQuickWalletBalance('walletBalanceInput', 'walletBalancePreview', 50000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+50.000</button>
+            <button type="button" onclick="addQuickWalletBalance('walletBalanceInput', 'walletBalancePreview', 100000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+100.000</button>
+            <button type="button" onclick="addQuickWalletBalance('walletBalanceInput', 'walletBalancePreview', 500000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+500.000</button>
+            <button type="button" onclick="addQuickWalletBalance('walletBalanceInput', 'walletBalancePreview', 1000000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+1.000.000</button>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onclick="closeWalletBalanceModal()"
+            data-i18n="btn_cancel"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white keep-white shadow-lg shadow-purple-500/20"
+          >
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span data-i18n="btn_save_balance">Simpan Saldo</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 4: TAMBAH WALLET BARU ================= -->
+  <div
+    id="modalAddWallet"
+    class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+          </div>
+          <h3 data-i18n="modal_new_wallet_title" class="text-base font-bold text-white">Tambah Wallet Baru</h3>
+        </div>
+        <button
+          type="button"
+          onclick="closeAddWalletModal()"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formAddWallet" novalidate autocomplete="off" class="p-5 space-y-4">
+        <div>
+          <label for="newWalletType" data-i18n="modal_new_wallet_type" class="block text-xs font-semibold text-slate-300 mb-1.5">
+            Jenis Wallet
+          </label>
+          <select
+            id="newWalletType"
+            data-custom-select="field"
+            class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark cursor-pointer"
+          >
+            <option value="Bank">Bank / Rekening</option>
+            <option value="E-Wallet">E-Wallet (Dompet Digital)</option>
+            <option value="Tunai">Tunai (Cash)</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="newWalletName" data-i18n="modal_new_wallet_name" class="block text-xs font-semibold text-slate-300 mb-1.5">
+            Nama Wallet
+          </label>
+          <input
+            type="text"
+            id="newWalletName"
+            autocomplete="off"
+            placeholder="Ketik nama Bank / E-Wallet / Cash..."
+            class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark"
+          />
+          <div id="newWalletNameError" class="hidden field-error-hint"></div>
+          <!-- Pintasan Pilihan Cepat -->
+          <div class="flex flex-wrap items-center gap-1.5 mt-2">
+            <button type="button" onclick="applyWalletPreset('BCA', 'Bank')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-slate-700/80 transition-colors">BCA</button>
+            <button type="button" onclick="applyWalletPreset('BNI', 'Bank')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-slate-700/80 transition-colors">BNI</button>
+            <button type="button" onclick="applyWalletPreset('BRI', 'Bank')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-slate-700/80 transition-colors">BRI</button>
+            <button type="button" onclick="applyWalletPreset('Mandiri', 'Bank')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-slate-700/80 transition-colors">Mandiri</button>
+            <button type="button" onclick="applyWalletPreset('SeaBank', 'Bank')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-emerald-500/20 text-slate-300 hover:text-emerald-300 border border-slate-700/80 transition-colors">SeaBank</button>
+            <button type="button" onclick="applyWalletPreset('GoPay', 'E-Wallet')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700/80 transition-colors">GoPay</button>
+            <button type="button" onclick="applyWalletPreset('DANA', 'E-Wallet')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700/80 transition-colors">DANA</button>
+            <button type="button" onclick="applyWalletPreset('OVO', 'E-Wallet')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700/80 transition-colors">OVO</button>
+            <button type="button" onclick="applyWalletPreset('ShopeePay', 'E-Wallet')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700/80 transition-colors">ShopeePay</button>
+            <button type="button" onclick="applyWalletPreset('Cash (Tunai)', 'Tunai')" class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-slate-800/90 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700/80 transition-colors">Cash</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="newWalletInitial" class="block text-xs font-semibold text-slate-300">
+              <span data-i18n="modal_new_wallet_initial">Saldo Awal</span> (<span data-currency-symbol>Rp</span>)
+            </label>
+            <span id="newWalletPreview" class="text-xs font-mono-num font-bold text-purple-300">
+              Rp 0
+            </span>
+          </div>
+          <div class="relative">
+            <span data-currency-symbol class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-mono-num font-semibold text-slate-400">
+              Rp
+            </span>
+            <input
+              type="text"
+              id="newWalletInitial"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="0"
+              class="w-full pl-11 pr-4 py-2.5 rounded-xl text-sm font-mono-num input-dark"
+            />
+          </div>
+          <div id="newWalletQuickAmounts" class="flex flex-wrap items-center gap-1.5 mt-2">
+            <button type="button" onclick="addQuickWalletBalance('newWalletInitial', 'newWalletPreview', 50000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+50.000</button>
+            <button type="button" onclick="addQuickWalletBalance('newWalletInitial', 'newWalletPreview', 100000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+100.000</button>
+            <button type="button" onclick="addQuickWalletBalance('newWalletInitial', 'newWalletPreview', 500000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+500.000</button>
+            <button type="button" onclick="addQuickWalletBalance('newWalletInitial', 'newWalletPreview', 1000000)" class="px-2.5 py-1 rounded-lg text-[11px] font-mono-num bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">+1.000.000</button>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onclick="closeAddWalletModal()"
+            data-i18n="btn_cancel"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white keep-white shadow-lg shadow-purple-500/20"
+          >
+            <i data-lucide="check" class="w-4 h-4 stroke-[2.5]"></i>
+            <span data-i18n="btn_save_wallet">Simpan Wallet</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 5: MONTHLY BUDGET ================= -->
+  <div
+    id="modalBudget"
+    class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-2xl rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel flex flex-col max-h-[88vh]">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500/25 to-teal-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shadow-inner shadow-emerald-500/15">
+            <i data-lucide="pie-chart" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 data-i18n="btn_monthly_budget" class="text-base font-extrabold tracking-wide text-white">Monthly Budget</h3>
+            <p id="budgetModalPeriodLabel" class="text-xs text-emerald-400 font-medium"></p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onclick="closeBudgetModal()"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="formBudget" novalidate autocomplete="off" class="flex flex-col flex-1 overflow-hidden">
+        <div id="budgetFormContainer" class="p-5 overflow-y-auto space-y-4 flex-1"></div>
+
+        <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/60 flex items-center justify-end gap-2.5">
+          <button
+            type="button"
+            onclick="closeBudgetModal()"
+            data-i18n="btn_cancel"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            type="submit"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition-all"
+          >
+            <i data-lucide="save" class="w-4 h-4"></i>
+            <span data-i18n="btn_save_budget">Simpan Budget</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 6: ALUR LOGIN GOOGLE 4 TAHAP (PILIH AKUN -> SETUJUI KEBIJAKAN -> ISI NAMA SAJA -> POPUP SELAMAT DATANG) ================= -->
+  <div
+    id="modalGoogleAuth"
+    class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div id="modalGoogleAuthPanel" class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden modal-panel">
+      <!-- Konten 4 Tahap dirender secara dinamis melalui renderGoogleAuthStep() di js/app.js -->
+      <div id="googleAuthStepContainer"></div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 7: PENGATURAN KATA SANDI (PIN, POLA 3x3, SIDIK JARI PERANGKAT) ================= -->
+  <div
+    id="modalSecuritySetup"
+    class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div class="w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <i data-lucide="lock" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 id="securitySetupTitle" data-i18n="modal_sec_title" class="text-base font-bold text-white">Atur Kata Sandi</h3>
+            <p id="securitySetupSubtitle" data-i18n="modal_sec_sub" class="text-xs text-slate-400">Pilih metode penguncian aplikasi</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onclick="closeSecuritySetupModal()"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Tab Switcher di dalam Modal Setup (PIN / Pola / Sidik Jari) -->
+      <div class="px-5 pt-4">
+        <div class="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-950/70 border border-slate-800">
+          <button
+            type="button"
+            onclick="switchSecuritySetupTab('pin')"
+            data-sec-tab="pin"
+            class="sec-setup-tab-btn py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+          >
+            <i data-lucide="key-round" class="w-3.5 h-3.5"></i>
+            <span data-i18n="sec_method_pin">PIN</span>
+          </button>
+          <button
+            type="button"
+            onclick="switchSecuritySetupTab('pattern')"
+            data-sec-tab="pattern"
+            class="sec-setup-tab-btn py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+          >
+            <i data-lucide="grid-3x3" class="w-3.5 h-3.5"></i>
+            <span data-i18n="sec_method_pattern">Pola</span>
+          </button>
+          <button
+            type="button"
+            onclick="switchSecuritySetupTab('fingerprint')"
+            data-sec-tab="fingerprint"
+            class="sec-setup-tab-btn py-2 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+          >
+            <i data-lucide="fingerprint" class="w-3.5 h-3.5"></i>
+            <span data-i18n="sec_method_fingerprint">Sidik Jari</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="securitySetupBody" class="p-5"></div>
+    </div>
+  </div>
+
+  <!-- ================= OVERLAY KUNCI LAYAR APLIKASI (APP LOCK OVERLAY) ================= -->
+  <div
+    id="appLockOverlay"
+    class="hidden fixed inset-0 z-[100] bg-slate-950/90 backdrop-blur-2xl flex flex-col items-center justify-center p-4 select-none"
+  >
+    <div class="w-full max-w-sm glass-card rounded-3xl p-6 text-center space-y-5 border border-slate-800 shadow-2xl">
+      <div class="flex flex-col items-center gap-2">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25 border border-emerald-400/30">
+          <i data-lucide="shield-lock" class="w-6 h-6 text-slate-950 stroke-[2.3]"></i>
+        </div>
+        <h2 data-i18n="lock_screen_title" class="text-lg font-extrabold text-white">FinanceTracker Terkunci</h2>
+        <p id="appLockPromptText" class="text-xs text-slate-400">Masukkan kata sandi Anda untuk membuka aplikasi</p>
+      </div>
+
+      <!-- Area Interaktif Buka Kunci (PIN / Pola / Sidik Jari) -->
+      <div id="appLockInteractiveArea"></div>
+
+      <!-- Opsi Ganti Metode / Reset Darurat -->
+      <div class="pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+        <span id="appLockMethodLabel" class="font-semibold text-emerald-400">PIN</span>
+        <button
+          type="button"
+          onclick="handleEmergencyResetLock()"
+          data-i18n="lock_screen_forgot"
+          class="text-rose-400 hover:text-rose-300 font-semibold underline"
+        >
+          Lupa Sandi? Reset Kunci
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-20 md:bottom-5 right-4 z-50 flex flex-col gap-2 max-w-[90vw]"></div>
+
+  <!-- Scripts -->
+  <script src="js/data.js?v=11"></script>
+  <script src="js/app.js?v=11"></script>
+</body>
+</html>
