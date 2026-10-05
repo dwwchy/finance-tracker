@@ -850,6 +850,10 @@ function switchTab(tabName) {
         if (c) c.resize();
       });
     }, 50);
+  } else if (tabName === 'wallets') {
+    requestAnimationFrame(() => {
+      if (typeof updateWalletFilterGlider === 'function') updateWalletFilterGlider();
+    });
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1034,10 +1038,90 @@ function renderHeaderCards(metrics) {
 
 // ================= RENDER UI: TAB WALLET =================
 
+const WALLET_FILTER_TABS = ['ALL', 'Bank', 'Tunai', 'E-Wallet'];
+
+function updateWalletFilterGlider() {
+  const container = document.getElementById('walletFilterContainer');
+  const glider = document.getElementById('walletFilterGlider');
+  if (!container || !glider) return;
+
+  const activeBtn = container.querySelector(`[data-wallet-filter="${state.walletTypeFilter || 'ALL'}"]`);
+  if (!activeBtn) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const btnRect = activeBtn.getBoundingClientRect();
+
+  if (btnRect.width === 0) return;
+
+  const left = btnRect.left - containerRect.left;
+  const width = btnRect.width;
+
+  glider.style.left = `${left}px`;
+  glider.style.width = `${width}px`;
+  glider.style.opacity = '1';
+}
+
 function setWalletTypeFilter(filterType) {
   state.walletTypeFilter = filterType || 'ALL';
   renderWalletsSection();
+  updateWalletFilterGlider();
   if (window.lucide) window.lucide.createIcons();
+}
+
+function initWalletSwipeGestures() {
+  const container = document.getElementById('walletsGridContainer');
+  if (!container || container._swipeInitialized) return;
+  container._swipeInitialized = true;
+
+  let startX = 0;
+  let startY = 0;
+  let isSwiping = false;
+
+  container.addEventListener(
+    'touchstart',
+    (e) => {
+      if (e.touches.length !== 1) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      isSwiping = true;
+    },
+    { passive: true }
+  );
+
+  container.addEventListener(
+    'touchend',
+    (e) => {
+      if (!isSwiping) return;
+      isSwiping = false;
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const diffX = endX - startX;
+      const diffY = endY - startY;
+
+      // Minimum swipe threshold 38px and horizontal dominant
+      if (Math.abs(diffX) > 38 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
+        const currentIndex = WALLET_FILTER_TABS.indexOf(state.walletTypeFilter || 'ALL');
+        if (diffX < 0) {
+          // Swiped LEFT -> Next tab
+          if (currentIndex < WALLET_FILTER_TABS.length - 1) {
+            container.classList.remove('wallet-slide-from-right', 'wallet-slide-from-left');
+            void container.offsetWidth;
+            container.classList.add('wallet-slide-from-right');
+            setWalletTypeFilter(WALLET_FILTER_TABS[currentIndex + 1]);
+          }
+        } else {
+          // Swiped RIGHT -> Previous tab
+          if (currentIndex > 0) {
+            container.classList.remove('wallet-slide-from-right', 'wallet-slide-from-left');
+            void container.offsetWidth;
+            container.classList.add('wallet-slide-from-left');
+            setWalletTypeFilter(WALLET_FILTER_TABS[currentIndex - 1]);
+          }
+        }
+      }
+    },
+    { passive: true }
+  );
 }
 
 function renderWalletsSection() {
@@ -1107,17 +1191,54 @@ function renderWalletsSection() {
     const fType = btn.getAttribute('data-wallet-filter');
     if (fType === state.walletTypeFilter) {
       btn.className =
-        'wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/35 transition-all text-center whitespace-nowrap focus:outline-none';
+        'wallet-filter-btn px-2.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold text-white transition-all text-center whitespace-nowrap focus:outline-none';
     } else {
       btn.className =
-        'wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition-all text-center whitespace-nowrap focus:outline-none';
+        'wallet-filter-btn px-2.5 sm:px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all text-center whitespace-nowrap focus:outline-none';
     }
   });
+
+  updateWalletFilterGlider();
+
+  // === DASHBOARD TOTAL SELURUH SALDO (DI ATAS TOTAL INCOME & TOTAL EXPENSES) ===
+  const dashTotalAllEl = document.getElementById('dashboardTotalAllBalance');
+  if (dashTotalAllEl) dashTotalAllEl.textContent = formatRp(totalFunds);
 
   const dashWalletTotalEl = document.getElementById('dashboardWalletTotal');
   if (dashWalletTotalEl) {
     dashWalletTotalEl.textContent = formatRp(totalFunds);
   }
+
+  const dashCountBadgeEl = document.getElementById('dashboardWalletCountBadge');
+  if (dashCountBadgeEl) dashCountBadgeEl.textContent = `${calculated.length} ${t('nav_wallets')}`;
+
+  const dashSumBankEl = document.getElementById('dashboardWalletSumBank');
+  if (dashSumBankEl) dashSumBankEl.textContent = formatRp(totalBank);
+  const dashSumCashEl = document.getElementById('dashboardWalletSumCash');
+  if (dashSumCashEl) dashSumCashEl.textContent = formatRp(totalCash);
+  const dashSumEwalletEl = document.getElementById('dashboardWalletSumEwallet');
+  if (dashSumEwalletEl) dashSumEwalletEl.textContent = formatRp(totalEwallet);
+
+  const dashCountBankEl = document.getElementById('dashboardWalletCountBank');
+  if (dashCountBankEl) dashCountBankEl.textContent = `${countBank} ${t('wallet_accounts_suffix')}`;
+  const dashCountCashEl = document.getElementById('dashboardWalletCountCash');
+  if (dashCountCashEl) dashCountCashEl.textContent = `${countCash} ${t('wallet_accounts_suffix')}`;
+  const dashCountEwalletEl = document.getElementById('dashboardWalletCountEwallet');
+  if (dashCountEwalletEl) dashCountEwalletEl.textContent = `${countEwallet} ${t('wallet_accounts_suffix')}`;
+
+  const dashPctBankEl = document.getElementById('dashboardWalletPctBank');
+  if (dashPctBankEl) dashPctBankEl.textContent = `${pctBank}%`;
+  const dashPctCashEl = document.getElementById('dashboardWalletPctCash');
+  if (dashPctCashEl) dashPctCashEl.textContent = `${pctCash}%`;
+  const dashPctEwalletEl = document.getElementById('dashboardWalletPctEwallet');
+  if (dashPctEwalletEl) dashPctEwalletEl.textContent = `${pctEwallet}%`;
+
+  const dashBarBankEl = document.getElementById('dashboardWalletBarBank');
+  if (dashBarBankEl) dashBarBankEl.style.width = `${pctBank}%`;
+  const dashBarCashEl = document.getElementById('dashboardWalletBarCash');
+  if (dashBarCashEl) dashBarCashEl.style.width = `${pctCash}%`;
+  const dashBarEwalletEl = document.getElementById('dashboardWalletBarEwallet');
+  if (dashBarEwalletEl) dashBarEwalletEl.style.width = `${pctEwallet}%`;
 
   const dashWalletChipsEl = document.getElementById('dashboardWalletChips');
   if (dashWalletChipsEl) {
@@ -3168,10 +3289,22 @@ function launchRealGoogleOAuthPopup(clientId) {
         if (tokenResponse && tokenResponse.access_token) {
           latestGoogleAccessToken = tokenResponse.access_token;
           await handleRealGoogleTokenSuccess(tokenResponse.access_token);
+        } else if (tokenResponse && tokenResponse.error) {
+          console.error('Google OAuth token error:', tokenResponse);
+          if (tokenResponse.error === 'access_denied') {
+            showToast('Akses Google ditolak. Pastikan aplikasi berstatus "In production" di Google Cloud Console & izinkan akses di HP.');
+          } else {
+            showToast('Gagal terhubung ke Google: ' + (tokenResponse.error_description || tokenResponse.error));
+          }
         }
       },
       error_callback: (err) => {
         console.warn('Google OAuth popup closed or error:', err);
+        if (err && err.type === 'popup_blocked') {
+          showToast('Pop-up Google diblokir browser HP Anda. Silakan izinkan pop-up di pengaturan browser.');
+        } else if (err && err.type === 'access_denied') {
+          showToast('Akses ditolak oleh Google. Buka aplikasi langsung di Chrome/Safari (bukan dari browser internal WhatsApp).');
+        }
       }
     });
     googleTokenClient.requestAccessToken({ prompt: 'select_account consent' });
@@ -6101,20 +6234,270 @@ function deleteTransaction(txId) {
   showToast(`${translateCategoryName(tx.category)} — ${t('btn_reset')}.`);
 }
 
-// ================= MODAL TAMBAH KATEGORI SENDIRI =================
+// ================= MODAL TAMBAH KATEGORI SENDIRI & SMART ICON SELECTOR =================
+
+const CATEGORY_ICON_CATALOG = [
+  { icon: 'gamepad-2', label: 'Gaming' },
+  { icon: 'shopping-bag', label: 'Shopping' },
+  { icon: 'utensils', label: 'Kuliner' },
+  { icon: 'coffee', label: 'Kopi' },
+  { icon: 'car', label: 'Mobil' },
+  { icon: 'fuel', label: 'Bensin' },
+  { icon: 'plane', label: 'Liburan' },
+  { icon: 'palmtree', label: 'Wisata' },
+  { icon: 'graduation-cap', label: 'Edukasi' },
+  { icon: 'book', label: 'Buku' },
+  { icon: 'heart-pulse', label: 'Kesehatan' },
+  { icon: 'dumbbell', label: 'Olahraga' },
+  { icon: 'shirt', label: 'Pakaian' },
+  { icon: 'film', label: 'Bioskop' },
+  { icon: 'tv', label: 'Streaming' },
+  { icon: 'music', label: 'Musik' },
+  { icon: 'gift', label: 'Hadiah' },
+  { icon: 'home', label: 'Rumah' },
+  { icon: 'wifi', label: 'Internet' },
+  { icon: 'zap', label: 'Listrik' },
+  { icon: 'droplets', label: 'Air' },
+  { icon: 'baby', label: 'Bayi' },
+  { icon: 'dog', label: 'Hewan' },
+  { icon: 'briefcase', label: 'Gaji' },
+  { icon: 'wallet', label: 'Dompet' },
+  { icon: 'piggy-bank', label: 'Tabungan' },
+  { icon: 'coins', label: 'Receh' },
+  { icon: 'trending-up', label: 'Investasi' },
+  { icon: 'laptop', label: 'Gadget' },
+  { icon: 'smartphone', label: 'HP / Pulsa' },
+  { icon: 'landmark', label: 'Bank' },
+  { icon: 'credit-card', label: 'Cicilan' },
+  { icon: 'shield-check', label: 'Asuransi' },
+  { icon: 'badge-percent', label: 'Diskon' },
+  { icon: 'wrench', label: 'Servis' },
+  { icon: 'scissors', label: 'Salon' },
+  { icon: 'sparkles', label: 'Skincare' },
+  { icon: 'award', label: 'Bonus' },
+  { icon: 'receipt', label: 'Tagihan' },
+  { icon: 'camera', label: 'Kamera' },
+  { icon: 'bike', label: 'Sepeda' },
+  { icon: 'bus', label: 'Transport' },
+  { icon: 'shield-alert', label: 'Darurat' },
+  { icon: 'layers', label: 'Lainnya' },
+  { icon: 'tag', label: 'Kategori' },
+  { icon: 'star', label: 'Favorit' },
+  { icon: 'heart', label: 'Keluarga' },
+  { icon: 'gem', label: 'Aset / Emas' }
+];
+
+const CATEGORY_KEYWORD_RULES = [
+  // 1. Listrik & PLN
+  { match: ['listrik', 'pln', 'token', 'energi', 'daya listrik', 'lampu'], icon: 'zap', label: 'Listrik' },
+  // 2. Air & PDAM
+  { match: ['pdam', 'tagihan air', 'air bersih'], icon: 'droplets', label: 'Air PDAM' },
+  // 3. Bahan bakar & SPBU
+  { match: ['bensin', 'bbm', 'pertalite', 'pertamax', 'solar', 'fuel', 'spbu', 'shell', 'bensin motor', 'bensin mobil'], icon: 'fuel', label: 'Bahan Bakar' },
+  // 4. Gaming
+  { match: ['gaming', 'game', 'ps5', 'ps4', 'xbox', 'steam', 'nintendo', 'valorant', 'mlbb', 'genshin', 'roblox', 'esport', 'mabar', 'gamepad', 'topup game'], icon: 'gamepad-2', label: 'Gaming' },
+  // 5. Kesehatan & Medis
+  { match: ['obat', 'dokter', 'sehat', 'kesehatan', 'medis', 'rumah sakit', 'vitamin', 'apotek', 'klinik', 'vaksin', 'lab', 'checkup', 'periksa', 'bpjs'], icon: 'heart-pulse', label: 'Kesehatan' },
+  // 6. Kopi & Kafe
+  { match: ['kopi', 'coffee', 'starbucks', 'ngopi', 'janji jiwa', 'kenangan', 'point coffee'], icon: 'coffee', label: 'Kopi' },
+  // 7. Makanan & Kuliner
+  { match: ['makan', 'kuliner', 'food', 'resto', 'restoran', 'cafe', 'kafe', 'sarapan', 'lunch', 'dinner', 'warung', 'snack', 'jajan', 'nasi', 'bakso', 'mie', 'gofood', 'grabfood', 'shopeefood'], icon: 'utensils', label: 'Makanan / Kuliner' },
+  // 8. Wifi & Internet
+  { match: ['wifi', 'internet', 'kuota', 'pulsa', 'indihome', 'biznet', 'myrepublic', 'telkomsel', 'by.u', 'kartu tri', 'paket data'], icon: 'wifi', label: 'Internet & Pulsa' },
+  // 9. Olahraga & Gym
+  { match: ['gym', 'olahraga', 'fitness', 'fitnes', 'sport', 'workout', 'renang', 'badminton', 'futsal', 'yoga'], icon: 'dumbbell', label: 'Olahraga' },
+  // 10. Liburan & Wisata
+  { match: ['liburan', 'wisata', 'travel', 'holiday', 'tiket pesawat', 'pesawat', 'tour', 'flight', 'jalan-jalan'], icon: 'plane', label: 'Liburan / Wisata' },
+  { match: ['pantai', 'beach', 'resort', 'hotel', 'staycation', 'villa'], icon: 'palmtree', label: 'Staycation' },
+  // 11. Edukasi & Buku
+  { match: ['sekolah', 'kuliah', 'pendidikan', 'kursus', 'les', 'kampus', 'spp', 'edukasi', 'skripsi', 'wisuda', 'bimbel'], icon: 'graduation-cap', label: 'Pendidikan' },
+  { match: ['buku', 'book', 'novel', 'gramedia', 'komik', 'ebook'], icon: 'book', label: 'Buku' },
+  // 12. Hiburan & Film
+  { match: ['nonton', 'bioskop', 'film', 'movie', 'cinema', 'xxi', 'cgv', 'netflix', 'disney', 'prime video', 'vidio'], icon: 'film', label: 'Hiburan Film' },
+  { match: ['musik', 'music', 'konser', 'spotify', 'apple music', 'lagu'], icon: 'music', label: 'Musik' },
+  { match: ['tv', 'televisi', 'streaming', 'youtube'], icon: 'tv', label: 'Streaming TV' },
+  // 13. Kendaraan & Otomotif
+  { match: ['mobil', 'motor', 'bengkel', 'parkir', 'service motor', 'service mobil', 'kendaraan', 'cuci motor', 'cuci mobil', 'tol'], icon: 'car', label: 'Otomotif' },
+  { match: ['sepeda', 'gowes', 'folding bike', 'roadbike'], icon: 'bike', label: 'Sepeda' },
+  { match: ['kereta', 'mrt', 'krl', 'angkot', 'ojek', 'grab', 'gojek', 'transport', 'transportasi', 'tije', 'busway', 'bus'], icon: 'bus', label: 'Transportasi' },
+  // 14. Pakaian & Fashion
+  { match: ['baju', 'pakaian', 'shirt', 'celana', 'sepatu', 'jaket', 'kaos', 'outfit', 'kondangan', 'gamis', 'hijab', 'dress'], icon: 'shirt', label: 'Pakaian' },
+  // 15. Skincare & Kecantikan
+  { match: ['skincare', 'kosmetik', 'makeup', 'kecantikan', 'perawatan', 'facial', 'serum', 'creambath'], icon: 'sparkles', label: 'Skincare' },
+  { match: ['salon', 'potong rambut', 'barber', 'cukur', 'barbershop'], icon: 'scissors', label: 'Salon / Cukur' },
+  // 16. Shopping umum
+  { match: ['shopping', 'belanja', 'toko', 'mall', 'tote', 'fashion', 'shopee', 'tokped', 'lazada', 'haul', 'tas', 'pasar'], icon: 'shopping-bag', label: 'Shopping' },
+  // 17. Rumah & Properti
+  { match: ['rumah', 'kost', 'kos-kosan', 'kontrakan', 'renovasi', 'properti', 'apartemen', 'perabot', 'mebel', 'tempat tinggal'], icon: 'home', label: 'Rumah & Properti' },
+  // 18. Bayi & Anak
+  { match: ['bayi', 'baby', 'anak', 'popok', 'susu formula', 'pampers', 'mainan anak'], icon: 'baby', label: 'Bayi & Anak' },
+  // 19. Hewan
+  { match: ['hewan', 'pet', 'kucing', 'anjing', 'cat', 'dog', 'petshop', 'vet', 'whiskas', 'royal canin'], icon: 'dog', label: 'Hewan Peliharaan' },
+  // 20. Hadiah & Donasi
+  { match: ['hadiah', 'kado', 'gift', 'donasi', 'sedekah', 'infaq', 'zakat', 'amal', 'charity', 'sumbangan', 'angpao'], icon: 'gift', label: 'Hadiah / Amal' },
+  // 21. Pekerjaan & Gaji
+  { match: ['gaji', 'salary', 'kantor', 'kerja', 'proyek', 'project', 'freelance', 'honor', 'upah', 'pendapatan', 'omset'], icon: 'briefcase', label: 'Gaji / Pekerjaan' },
+  // 22. Tabungan & Investasi
+  { match: ['darurat', 'emergency'], icon: 'shield-alert', label: 'Dana Darurat' },
+  { match: ['tabungan', 'celengan', 'simpanan', 'saving', 'dana nikah', 'haji', 'umroh', 'kurban', 'qurban', 'beli rumah'], icon: 'piggy-bank', label: 'Tabungan' },
+  { match: ['investasi', 'saham', 'crypto', 'kripto', 'reksadana', 'dividen', 'cuan', 'emas', 'gold', 'bibit', 'ajaib', 'pluang'], icon: 'trending-up', label: 'Investasi' },
+  // 23. Gadget & Elektronik
+  { match: ['gadget', 'laptop', 'komputer', 'elektronik', 'pc', 'ipad', 'tablet', 'macbook'], icon: 'laptop', label: 'Gadget / Komputer' },
+  { match: ['hp', 'smartphone', 'handphone', 'iphone', 'android', 'samsung'], icon: 'smartphone', label: 'Handphone' },
+  // 24. Finansial & Tagihan
+  { match: ['bank', 'pajak', 'bunga', 'deposito', 'admin bank', 'bunga bank'], icon: 'landmark', label: 'Perbankan' },
+  { match: ['kartu kredit', 'credit card', 'paylater', 'cicilan', 'utang', 'hutang', 'pinjol', 'kredivo', 'spaylater'], icon: 'credit-card', label: 'Cicilan / Kredit' },
+  { match: ['asuransi', 'insurance', 'prudential', 'allianz', 'manulife'], icon: 'shield-check', label: 'Asuransi' },
+  { match: ['diskon', 'promo', 'cashback', 'voucher'], icon: 'badge-percent', label: 'Promo / Cashback' },
+  { match: ['servis', 'service', 'alat', 'perbaikan', 'reparasi', 'pertukangan'], icon: 'wrench', label: 'Perbaikan' },
+  { match: ['bonus', 'thr', 'reward', 'hadiah lomba', 'insentif'], icon: 'award', label: 'Bonus / THR' },
+  { match: ['tagihan', 'iuran', 'bill', 'retribusi', 'keamanan', 'kebersihan'], icon: 'receipt', label: 'Tagihan' },
+  { match: ['foto', 'kamera', 'fotografi', 'video'], icon: 'camera', label: 'Fotografi' }
+];
+
+let isManualCategoryIconSelected = false;
+
+function detectIconFromCategoryName(name, type) {
+  if (!name || !name.trim()) {
+    return {
+      icon: type === 'Savings' ? 'piggy-bank' : type === 'Income' ? 'coins' : 'shopping-bag',
+      label: ''
+    };
+  }
+
+  const clean = name.toLowerCase().trim();
+  for (const rule of CATEGORY_KEYWORD_RULES) {
+    for (const kw of rule.match) {
+      if (clean.includes(kw)) {
+        return { icon: rule.icon, label: rule.label };
+      }
+    }
+  }
+
+  return {
+    icon: type === 'Savings' ? 'piggy-bank' : type === 'Income' ? 'coins' : 'shopping-bag',
+    label: ''
+  };
+}
+
+function renderCustomCategoryIconGrid(selectedIcon) {
+  const grid = document.getElementById('customCategoryIconGrid');
+  if (!grid) return;
+
+  grid.innerHTML = CATEGORY_ICON_CATALOG.map((item) => {
+    const isActive = item.icon === selectedIcon;
+    return `
+      <button
+        type="button"
+        onclick="selectCustomCategoryIcon('${item.icon}', true)"
+        class="cat-icon-choice ${isActive ? 'active' : ''}"
+        title="${item.label}"
+      >
+        <i data-lucide="${item.icon}" class="w-4 h-4 mb-1 pointer-events-none"></i>
+        <span class="text-[9px] truncate max-w-full font-medium leading-none pointer-events-none">${item.label}</span>
+      </button>
+    `;
+  }).join('');
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function selectCustomCategoryIcon(iconName, isManual = false, customHint = '') {
+  if (isManual) {
+    isManualCategoryIconSelected = true;
+  }
+
+  const hiddenInput = document.getElementById('customCatSelectedIcon');
+  if (hiddenInput) hiddenInput.value = iconName;
+
+  const labelEl = document.getElementById('customCatSelectedIconLabel');
+  if (labelEl) labelEl.textContent = iconName;
+
+  const previewIcon = document.getElementById('customCatPreviewIcon');
+  if (previewIcon) {
+    previewIcon.setAttribute('data-lucide', iconName);
+  }
+
+  // Update active state in grid buttons
+  document.querySelectorAll('.cat-icon-choice').forEach((btn) => {
+    const iconEl = btn.querySelector('i');
+    const bIcon = iconEl ? iconEl.getAttribute('data-lucide') : '';
+    if (bIcon === iconName) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  // Update auto hint
+  const hintEl = document.getElementById('customCatAutoHint');
+  const hintText = document.getElementById('customCatAutoHintText');
+  if (hintEl && hintText) {
+    if (customHint) {
+      hintText.textContent = customHint;
+      hintEl.classList.remove('opacity-0');
+      hintEl.classList.add('opacity-100');
+    } else if (isManual) {
+      hintText.textContent = 'Pilihan Manual';
+      hintEl.classList.remove('opacity-0');
+      hintEl.classList.add('opacity-100');
+    } else {
+      hintEl.classList.remove('opacity-100');
+      hintEl.classList.add('opacity-0');
+    }
+  }
+
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function randomizeCustomCategoryIcon() {
+  const randomIndex = Math.floor(Math.random() * CATEGORY_ICON_CATALOG.length);
+  const picked = CATEGORY_ICON_CATALOG[randomIndex];
+  const box = document.getElementById('customCatPreviewIconBox');
+  if (box) {
+    box.style.transform = 'scale(1.18) rotate(12deg)';
+    setTimeout(() => {
+      box.style.transform = '';
+    }, 220);
+  }
+  selectCustomCategoryIcon(picked.icon, true, `🎲 ${picked.label}`);
+}
 
 function openAddCategoryModal(defaultType = 'Savings') {
+  isManualCategoryIconSelected = false;
   const typeSelect = document.getElementById('customCatType');
   typeSelect.value = defaultType;
   syncCustomSelectTrigger(typeSelect);
-  document.getElementById('customCatName').value = '';
+
+  const nameInput = document.getElementById('customCatName');
+  nameInput.value = '';
   clearFieldValidationError('customCatName', 'customCatNameError');
+
+  const previewName = document.getElementById('customCatPreviewName');
+  if (previewName) previewName.textContent = 'Nama Kategori';
+
+  const previewBadge = document.getElementById('customCatPreviewBadge');
+  if (previewBadge) {
+    previewBadge.textContent = defaultType;
+    if (defaultType === 'Savings') {
+      previewBadge.className = 'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30';
+    } else if (defaultType === 'Expense') {
+      previewBadge.className = 'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30';
+    } else {
+      previewBadge.className = 'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+    }
+  }
+
+  const defaultIcon = defaultType === 'Savings' ? 'piggy-bank' : defaultType === 'Income' ? 'coins' : 'shopping-bag';
+  renderCustomCategoryIconGrid(defaultIcon);
+  selectCustomCategoryIcon(defaultIcon, false, '');
 
   const modal = document.getElementById('modalAddCategory');
   modal.classList.remove('hidden');
   requestAnimationFrame(() => {
     modal.classList.add('modal-open');
-    document.getElementById('customCatName').focus();
+    nameInput.focus();
+    if (window.lucide) window.lucide.createIcons();
   });
 }
 
@@ -6132,6 +6515,7 @@ function handleAddCategorySubmit(e) {
   e.preventDefault();
   const type = document.getElementById('customCatType').value || 'Savings';
   const name = document.getElementById('customCatName').value.trim();
+  const icon = document.getElementById('customCatSelectedIcon').value || (type === 'Savings' ? 'piggy-bank' : type === 'Income' ? 'coins' : 'shopping-bag');
 
   if (!name) {
     showFieldValidationError('customCatName', 'customCatNameError', t('modal_cat_name_label'));
@@ -6152,7 +6536,7 @@ function handleAddCategorySubmit(e) {
   state.customCategories[type].push({
     id: 'cat_' + Date.now(),
     name,
-    icon: type === 'Savings' ? 'piggy-bank' : type === 'Income' ? 'coins' : 'shopping-bag'
+    icon
   });
 
   saveCustomCategoriesToStorage();
@@ -6695,6 +7079,7 @@ function initApp() {
   );
   window.addEventListener('resize', () => {
     closeCustomSelectPortal();
+    if (typeof updateWalletFilterGlider === 'function') updateWalletFilterGlider();
   });
 
   document.getElementById('formTransaction').addEventListener('submit', handleTransactionFormSubmit);
@@ -6702,6 +7087,51 @@ function initApp() {
   document.getElementById('formAddCategory').addEventListener('submit', handleAddCategorySubmit);
   document.getElementById('formWalletBalance').addEventListener('submit', handleSaveWalletBalance);
   document.getElementById('formAddWallet').addEventListener('submit', handleAddWalletSubmit);
+
+  const customCatNameInput = document.getElementById('customCatName');
+  if (customCatNameInput) {
+    customCatNameInput.addEventListener('input', (e) => {
+      const name = e.target.value.trim();
+      const previewName = document.getElementById('customCatPreviewName');
+      if (previewName) {
+        previewName.textContent = name || 'Nama Kategori';
+      }
+
+      if (!isManualCategoryIconSelected) {
+        const type = document.getElementById('customCatType').value || 'Savings';
+        const detected = detectIconFromCategoryName(name, type);
+        selectCustomCategoryIcon(detected.icon, false, detected.label ? `✨ Ikon Otomatis: ${detected.label}` : '');
+      }
+    });
+  }
+
+  const customCatTypeSelect = document.getElementById('customCatType');
+  if (customCatTypeSelect) {
+    customCatTypeSelect.addEventListener('change', (e) => {
+      const type = e.target.value || 'Savings';
+      const previewBadge = document.getElementById('customCatPreviewBadge');
+      if (previewBadge) {
+        previewBadge.textContent = type;
+        if (type === 'Savings') {
+          previewBadge.className = 'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30';
+        } else if (type === 'Expense') {
+          previewBadge.className = 'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30';
+        } else {
+          previewBadge.className = 'inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        }
+      }
+
+      if (!isManualCategoryIconSelected) {
+        const name = document.getElementById('customCatName').value.trim();
+        const detected = detectIconFromCategoryName(name, type);
+        selectCustomCategoryIcon(detected.icon, false, detected.label ? `✨ Ikon Otomatis: ${detected.label}` : '');
+      }
+    });
+  }
+
+  if (typeof initWalletSwipeGestures === 'function') {
+    initWalletSwipeGestures();
+  }
 
   document.getElementById('txSearchInput').addEventListener('input', (e) => {
     state.txSearchQuery = e.target.value;

@@ -50,7 +50,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="css/styles.css?v=11" />
+  <link rel="stylesheet" href="css/styles.css?v=12" />
 </head>
 <body class="antialiased selection:bg-emerald-500 selection:text-slate-950 pb-24 md:pb-10">
 
@@ -240,6 +240,131 @@
          ======================================================================= -->
     <div id="tabSection-dashboard" class="tab-section space-y-5">
 
+      <!-- ================= HERO: TOTAL SELURUH SALDO (SEMUA SUMBER DANA) ================= -->
+      <section aria-label="Total Seluruh Saldo">
+        <div class="rounded-2xl p-4 sm:p-5 card-wallets space-y-4 shadow-xl">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-lg bg-purple-500/20 border border-purple-500/35 flex items-center justify-center text-purple-300 shrink-0">
+                  <i data-lucide="wallet-cards" class="w-3.5 h-3.5"></i>
+                </div>
+                <span data-i18n="dashboard_total_all_balance" class="text-xs font-bold uppercase tracking-wider text-purple-300 whitespace-nowrap">
+                  TOTAL SELURUH SALDO
+                </span>
+                <span
+                  id="dashboardWalletCountBadge"
+                  class="px-2.5 py-0.5 rounded-full text-[10px] font-mono-num font-bold bg-purple-500/20 text-purple-200 border border-purple-500/30 whitespace-nowrap"
+                >
+                  0 Wallet
+                </span>
+              </div>
+              <h2 id="dashboardTotalAllBalance" class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white tracking-tight">
+                Rp 0
+              </h2>
+              <p data-i18n="dashboard_all_balance_desc" class="text-xs text-slate-300/85 leading-relaxed">
+                Total akumulasi saldo dari semua sumber dana (Rekening Bank, Dompet Digital & Kas Tunai).
+              </p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 w-full sm:w-auto sm:flex sm:items-center">
+              <button
+                type="button"
+                onclick="openAddWalletModal()"
+                class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 h-10 px-3 sm:px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white keep-white shadow-lg shadow-purple-500/25 transition-all text-center focus:outline-none shrink-0"
+              >
+                <i data-lucide="plus" class="w-4 h-4 stroke-[2.5] shrink-0"></i>
+                <span data-i18n="btn_add_wallet" class="truncate">Tambah Wallet</span>
+              </button>
+              <button
+                type="button"
+                onclick="switchTab('wallets')"
+                class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 h-10 px-3 sm:px-4 rounded-xl text-xs font-bold bg-slate-900/80 hover:bg-slate-800 text-purple-200 border border-purple-500/40 transition-all text-center focus:outline-none shrink-0"
+              >
+                <i data-lucide="arrow-up-right" class="w-4 h-4 shrink-0"></i>
+                <span data-i18n="btn_manage_wallets" class="truncate">Kelola Wallet</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 3 Kartu Kategori Sumber Dana: Bank, E-Wallet, Tunai -->
+          <div class="grid grid-cols-3 gap-2 sm:gap-3.5 pt-3.5 border-t border-purple-500/20">
+            <!-- Bank -->
+            <div
+              onclick="switchTab('wallets'); setWalletTypeFilter('Bank');"
+              class="cursor-pointer p-2.5 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-1"
+            >
+              <div class="flex items-center justify-between gap-1">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <i data-lucide="building-2" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+                  <span data-i18n="wallet_cat_bank" class="text-xs font-bold text-slate-200 truncate">Bank</span>
+                </div>
+                <span id="dashboardWalletPctBank" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-emerald-300">0%</span>
+              </div>
+              <div id="dashboardWalletSumBank" class="text-xs sm:text-base font-extrabold font-mono-num text-emerald-400 truncate">
+                Rp 0
+              </div>
+              <div class="space-y-1 pt-0.5">
+                <span id="dashboardWalletCountBank" class="block text-[10px] font-medium text-slate-400 truncate">0 Akun</span>
+                <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
+                  <div id="dashboardWalletBarBank" class="h-full rounded-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- E-Wallet -->
+            <div
+              onclick="switchTab('wallets'); setWalletTypeFilter('E-Wallet');"
+              class="cursor-pointer p-2.5 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-purple-500/40 transition-all flex flex-col justify-between gap-1"
+            >
+              <div class="flex items-center justify-between gap-1">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <i data-lucide="smartphone" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
+                  <span data-i18n="wallet_cat_ewallet" class="text-xs font-bold text-slate-200 truncate">E-Wallet</span>
+                </div>
+                <span id="dashboardWalletPctEwallet" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-purple-300">0%</span>
+              </div>
+              <div id="dashboardWalletSumEwallet" class="text-xs sm:text-base font-extrabold font-mono-num text-purple-400 truncate">
+                Rp 0
+              </div>
+              <div class="space-y-1 pt-0.5">
+                <span id="dashboardWalletCountEwallet" class="block text-[10px] font-medium text-slate-400 truncate">0 Akun</span>
+                <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
+                  <div id="dashboardWalletBarEwallet" class="h-full rounded-full bg-purple-500 transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tunai / Cash -->
+            <div
+              onclick="switchTab('wallets'); setWalletTypeFilter('Tunai');"
+              class="cursor-pointer p-2.5 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-1"
+            >
+              <div class="flex items-center justify-between gap-1">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <i data-lucide="banknote" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+                  <span data-i18n="wallet_cat_cash" class="text-xs font-bold text-slate-200 truncate">Tunai</span>
+                </div>
+                <span id="dashboardWalletPctCash" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-amber-300">0%</span>
+              </div>
+              <div id="dashboardWalletSumCash" class="text-xs sm:text-base font-extrabold font-mono-num text-amber-400 truncate">
+                Rp 0
+              </div>
+              <div class="space-y-1 pt-0.5">
+                <span id="dashboardWalletCountCash" class="block text-[10px] font-medium text-slate-400 truncate">0 Akun</span>
+                <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
+                  <div id="dashboardWalletBarCash" class="h-full rounded-full bg-amber-500 transition-all duration-500" style="width: 0%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rincian Akun Wallet Aktif (Chips) -->
+          <div id="dashboardWalletChips" class="hidden flex-wrap items-center gap-2 pt-2 border-t border-purple-500/20"></div>
+          <span id="dashboardWalletTotal" class="hidden">Rp 0</span>
+        </div>
+      </section>
+
       <!-- 4 HEADER SUMMARY CARDS -->
       <section aria-label="Ringkasan Keuangan Utama">
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 items-stretch">
@@ -317,29 +442,6 @@
           </div>
 
         </div>
-      </section>
-
-      <!-- BAR RINGKASAN WALLET DI DASHBOARD -->
-      <section class="rounded-2xl p-3.5 sm:p-4 card-wallets">
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center text-purple-300 shrink-0">
-              <i data-lucide="wallet-cards" class="w-4 h-4"></i>
-            </div>
-            <div class="flex items-center gap-2.5">
-              <h3 data-i18n="nav_wallets" class="text-xs sm:text-sm font-bold text-white">Wallet</h3>
-              <span id="dashboardWalletTotal" class="text-xs sm:text-sm font-mono-num font-extrabold text-purple-300">Rp 0</span>
-            </div>
-          </div>
-          <button
-            onclick="switchTab('wallets')"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 transition-all shrink-0"
-          >
-            <i data-lucide="wallet" class="w-3.5 h-3.5"></i>
-            <span data-i18n="btn_open_wallet">Buka Wallet</span>
-          </button>
-        </div>
-        <div id="dashboardWalletChips" class="hidden flex-wrap items-center gap-2 mt-3 pt-3 border-t border-purple-500/20"></div>
       </section>
 
       <!-- ANALYTICS VISUAL -->
@@ -435,150 +537,67 @@
          TAB WALLET
          ======================================================================= -->
     <div id="tabSection-wallets" class="tab-section hidden space-y-4">
-      <!-- Hero & 3-Column Summary Card -->
-      <div class="rounded-2xl p-4 sm:p-5 card-wallets space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3.5">
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <span data-i18n="wallet_total_title" class="text-xs font-bold uppercase tracking-wider text-purple-300 whitespace-nowrap">
-                Total Saldo Wallet
-              </span>
-              <span
-                id="walletCountBadge"
-                class="px-2.5 py-0.5 rounded-full text-[10px] font-mono-num font-bold bg-purple-500/20 text-purple-200 border border-purple-500/30 whitespace-nowrap"
-              >
-                0 Wallet
-              </span>
+      <!-- Toolbar Ringkasan & Filter Kategori Wallet -->
+      <div class="glass-card rounded-2xl p-4 sm:p-5 space-y-3.5">
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-purple-500/20 border border-purple-500/35 flex items-center justify-center text-purple-300 shrink-0">
+              <i data-lucide="wallet-cards" class="w-4 h-4"></i>
             </div>
-            <h2 id="walletTotalBalance" class="text-2xl sm:text-3xl font-extrabold font-mono-num text-white tracking-tight">
-              Rp 0
-            </h2>
-            <p data-i18n="wallet_hero_desc" class="text-xs text-slate-300/85 leading-relaxed">
-              Pantau & kelola saldo rekening bank, dompet digital (E-Wallet), dan uang tunai Anda di satu tempat.
-            </p>
+            <h3 data-i18n="wallet_list_title" class="text-sm sm:text-base font-bold text-white tracking-tight">Daftar Penyimpanan Dana</h3>
           </div>
-
-          <button
-            type="button"
-            onclick="openAddWalletModal()"
-            class="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white keep-white shadow-lg shadow-purple-500/25 transition-all whitespace-nowrap shrink-0 focus:outline-none"
-          >
-            <i data-lucide="plus" class="w-4 h-4 stroke-[2.5]"></i>
-            <span data-i18n="btn_add_wallet">Tambah Wallet</span>
-          </button>
-        </div>
-
-        <!-- Baris Bawah: 3 Kartu Kategori Wallet -->
-        <div class="grid grid-cols-3 gap-2.5 sm:gap-3.5 pt-3.5 border-t border-purple-500/20">
-          <!-- Bank -->
-          <div
-            onclick="setWalletTypeFilter('Bank')"
-            class="cursor-pointer p-3 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-emerald-500/40 transition-all flex flex-col justify-between gap-1.5"
-          >
-            <div class="flex items-center justify-between gap-1">
-              <span data-i18n="wallet_cat_bank" class="text-xs font-bold text-slate-200 whitespace-nowrap">Bank</span>
-              <span id="walletPctBank" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-emerald-300">0%</span>
-            </div>
-            <div id="walletSumBank" class="text-xs sm:text-base font-extrabold font-mono-num text-emerald-400 truncate">
-              Rp 0
-            </div>
-            <div class="space-y-1.5 pt-0.5">
-              <span id="walletCountBank" class="block text-[10px] font-medium text-slate-400 whitespace-nowrap">0 Akun</span>
-              <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
-                <div id="walletBarBank" class="h-full rounded-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Cash (Tunai) -->
-          <div
-            onclick="setWalletTypeFilter('Tunai')"
-            class="cursor-pointer p-3 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-amber-500/40 transition-all flex flex-col justify-between gap-1.5"
-          >
-            <div class="flex items-center justify-between gap-1">
-              <span data-i18n="wallet_cat_cash" class="text-xs font-bold text-slate-200 whitespace-nowrap">Cash</span>
-              <span id="walletPctCash" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-amber-300">0%</span>
-            </div>
-            <div id="walletSumCash" class="text-xs sm:text-base font-extrabold font-mono-num text-amber-400 truncate">
-              Rp 0
-            </div>
-            <div class="space-y-1.5 pt-0.5">
-              <span id="walletCountCash" class="block text-[10px] font-medium text-slate-400 whitespace-nowrap">0 Akun</span>
-              <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
-                <div id="walletBarCash" class="h-full rounded-full bg-amber-400 transition-all duration-500" style="width: 0%"></div>
-              </div>
-            </div>
-          </div>
-
-          <!-- E-Wallet -->
-          <div
-            onclick="setWalletTypeFilter('E-Wallet')"
-            class="cursor-pointer p-3 sm:p-3.5 rounded-xl bg-slate-950/60 hover:bg-slate-900/80 border border-slate-800/80 hover:border-cyan-500/40 transition-all flex flex-col justify-between gap-1.5"
-          >
-            <div class="flex items-center justify-between gap-1">
-              <span data-i18n="wallet_cat_ewallet" class="text-xs font-bold text-slate-200 whitespace-nowrap">E-Wallet</span>
-              <span id="walletPctEwallet" class="hidden sm:inline-block text-[10px] font-mono-num font-semibold text-cyan-300">0%</span>
-            </div>
-            <div id="walletSumEwallet" class="text-xs sm:text-base font-extrabold font-mono-num text-cyan-400 truncate">
-              Rp 0
-            </div>
-            <div class="space-y-1.5 pt-0.5">
-              <span id="walletCountEwallet" class="block text-[10px] font-medium text-slate-400 whitespace-nowrap">0 Akun</span>
-              <div class="w-full h-1 rounded-full bg-slate-800/80 overflow-hidden">
-                <div id="walletBarEwallet" class="h-full rounded-full bg-cyan-400 transition-all duration-500" style="width: 0%"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Toolbar Filter Kategori Wallet -->
-      <div class="glass-card rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h3 data-i18n="wallet_list_title" class="text-xs sm:text-sm font-bold text-white">Daftar Penyimpanan Dana</h3>
-          <p data-i18n="wallet_list_desc" class="text-[11px] text-slate-400 mt-0.5">
-            Pilih kategori untuk menampilkan rincian saldo masing-masing wallet Anda.
+          <p data-i18n="wallet_list_desc" class="text-xs text-slate-300/85 leading-relaxed text-justify sm:text-left">
+            Pusat pemantauan seluruh akun penyimpanan dana Anda yang mencakup rekening Bank, dompet digital (E-Wallet), dan kas Tunai. Pilih kategori di bawah ini untuk melihat rincian saldo, mutasi dana masuk, pengeluaran terpakai, serta proporsi masing-masing dompet penyimpanan secara real-time.
           </p>
         </div>
 
-        <!-- Filter Pills -->
-        <div class="grid grid-cols-4 sm:flex items-center gap-1 bg-slate-950/60 p-1 rounded-xl border border-slate-800/80 shrink-0">
-          <button
-            type="button"
-            onclick="setWalletTypeFilter('ALL')"
-            data-wallet-filter="ALL"
-            data-i18n="filter_all"
-            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold bg-purple-500/20 text-purple-300 border border-purple-500/35 transition-all text-center whitespace-nowrap focus:outline-none"
-          >
-            Semua
-          </button>
-          <button
-            type="button"
-            onclick="setWalletTypeFilter('Bank')"
-            data-wallet-filter="Bank"
-            data-i18n="wallet_cat_bank"
-            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition-all text-center whitespace-nowrap focus:outline-none"
-          >
-            Bank
-          </button>
-          <button
-            type="button"
-            onclick="setWalletTypeFilter('Tunai')"
-            data-wallet-filter="Tunai"
-            data-i18n="wallet_cat_cash"
-            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition-all text-center whitespace-nowrap focus:outline-none"
-          >
-            Cash
-          </button>
-          <button
-            type="button"
-            onclick="setWalletTypeFilter('E-Wallet')"
-            data-wallet-filter="E-Wallet"
-            data-i18n="wallet_cat_ewallet"
-            class="wallet-filter-btn px-2.5 sm:px-3.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold text-slate-400 hover:text-slate-200 border border-transparent transition-all text-center whitespace-nowrap focus:outline-none"
-          >
-            E-Wallet
-          </button>
+        <!-- Filter Pills dengan Animasi Glider Geser Interaktif (Image 2) -->
+        <div class="relative p-1 rounded-2xl bg-slate-950/80 border border-slate-800/90 w-full sm:w-fit overflow-hidden" id="walletFilterContainer">
+          <!-- Glider Pill Indicator -->
+          <div
+            id="walletFilterGlider"
+            class="absolute top-1 bottom-1 rounded-xl bg-gradient-to-r from-purple-500/25 to-indigo-500/25 border border-purple-500/50 shadow-md shadow-purple-500/20 transition-all duration-300 ease-out pointer-events-none"
+            style="left: 4px; width: 0px;"
+          ></div>
+
+          <div class="relative grid grid-cols-4 sm:flex items-center gap-1 z-10">
+            <button
+              type="button"
+              onclick="setWalletTypeFilter('ALL')"
+              data-wallet-filter="ALL"
+              data-i18n="filter_all"
+              class="wallet-filter-btn px-2.5 sm:px-4 py-1.5 rounded-xl text-xs font-bold transition-all text-center whitespace-nowrap focus:outline-none"
+            >
+              Semua
+            </button>
+            <button
+              type="button"
+              onclick="setWalletTypeFilter('Bank')"
+              data-wallet-filter="Bank"
+              data-i18n="wallet_cat_bank"
+              class="wallet-filter-btn px-2.5 sm:px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all text-center whitespace-nowrap focus:outline-none"
+            >
+              Bank
+            </button>
+            <button
+              type="button"
+              onclick="setWalletTypeFilter('Tunai')"
+              data-wallet-filter="Tunai"
+              data-i18n="wallet_cat_cash"
+              class="wallet-filter-btn px-2.5 sm:px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all text-center whitespace-nowrap focus:outline-none"
+            >
+              Cash
+            </button>
+            <button
+              type="button"
+              onclick="setWalletTypeFilter('E-Wallet')"
+              data-wallet-filter="E-Wallet"
+              data-i18n="wallet_cat_ewallet"
+              class="wallet-filter-btn px-2.5 sm:px-4 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all text-center whitespace-nowrap focus:outline-none"
+            >
+              E-Wallet
+            </button>
+          </div>
         </div>
       </div>
 
@@ -745,25 +764,15 @@
     <div id="tabSection-history" class="tab-section hidden space-y-4">
       <div class="glass-card rounded-2xl overflow-hidden">
         <div class="p-4 sm:p-5 border-b border-slate-800 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <div class="w-1.5 h-5 rounded-full bg-emerald-500"></div>
-              <h2 data-i18n="history_title" class="text-base font-bold text-white">Riwayat Transaksi</h2>
-              <span
-                id="txCountBadge"
-                class="px-2 py-0.5 rounded-full text-xs font-mono-num bg-slate-800 text-slate-300 border border-slate-700"
-              >
-                0 Transaksi
-              </span>
-            </div>
-
-            <button
-              onclick="clearAllFinanceData()"
-              class="md:hidden inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30"
+          <div class="flex items-center gap-2">
+            <div class="w-1.5 h-5 rounded-full bg-emerald-500"></div>
+            <h2 data-i18n="history_title" class="text-base font-bold text-white">Riwayat Transaksi</h2>
+            <span
+              id="txCountBadge"
+              class="px-2 py-0.5 rounded-full text-xs font-mono-num bg-slate-800 text-slate-300 border border-slate-700"
             >
-              <i data-lucide="trash-2" class="w-3 h-3"></i>
-              <span data-i18n="btn_reset_short">Reset</span>
-            </button>
+              0 Transaksi
+            </span>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
@@ -1278,24 +1287,28 @@
     role="dialog"
     aria-modal="true"
   >
-    <div class="w-full max-w-md rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel">
-      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+    <div class="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-slate-900 border-t sm:border border-slate-700/80 shadow-2xl overflow-hidden modal-panel max-h-[92vh] flex flex-col">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60 shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
             <i data-lucide="folder-plus" class="w-4 h-4"></i>
           </div>
-          <h3 data-i18n="modal_cat_title" class="text-base font-bold text-white">Tambah Kategori Baru</h3>
+          <div>
+            <h3 data-i18n="modal_cat_title" class="text-base font-bold text-white">Tambah Kategori Baru</h3>
+            <p class="text-[11px] text-slate-400">Ikon otomatis terdeteksi atau pilih dari puluhan logo umum</p>
+          </div>
         </div>
         <button
           type="button"
           onclick="closeAddCategoryModal()"
-          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
         >
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <form id="formAddCategory" novalidate autocomplete="off" class="p-5 space-y-4">
+      <form id="formAddCategory" novalidate autocomplete="off" class="p-5 space-y-4 overflow-y-auto flex-1">
+        <!-- 1. Kelompok Pos (Savings / Expense / Income) -->
         <div>
           <label for="customCatType" data-i18n="modal_cat_group_label" class="block text-xs font-semibold text-slate-300 mb-1.5">
             Kelompok Pos
@@ -1311,32 +1324,91 @@
           </select>
         </div>
 
+        <!-- 2. Nama Kategori Baru -->
         <div>
-          <label for="customCatName" data-i18n="modal_cat_name_label" class="block text-xs font-semibold text-slate-300 mb-1.5">
-            Nama Kategori Baru
-          </label>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="customCatName" data-i18n="modal_cat_name_label" class="block text-xs font-semibold text-slate-300">
+              Nama Kategori Baru
+            </label>
+            <span id="customCatAutoHint" class="text-[11px] font-medium text-emerald-400 flex items-center gap-1 transition-opacity opacity-0">
+              <i data-lucide="sparkles" class="w-3 h-3 text-emerald-400"></i>
+              <span id="customCatAutoHintText">Ikon Otomatis</span>
+            </span>
+          </div>
           <input
             type="text"
             id="customCatName"
             autocomplete="off"
-            placeholder="Contoh: Tabungan Rumah / Liburan / Gadget..."
+            placeholder="Ketik kategori (contoh: Gaming, Shopping, Liburan, Makan...)"
             class="w-full px-3.5 py-2.5 rounded-xl text-sm input-dark"
           />
           <div id="customCatNameError" class="hidden field-error-hint"></div>
         </div>
 
-        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
+        <!-- 3. Live Preview & Tombol Acak Ikon -->
+        <div class="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0">
+            <div id="customCatPreviewIconBox" class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner transition-transform">
+              <i id="customCatPreviewIcon" data-lucide="piggy-bank" class="w-5 h-5"></i>
+            </div>
+            <div class="min-w-0">
+              <span id="customCatPreviewName" class="font-bold text-sm text-white block truncate">Nama Kategori</span>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span id="customCatPreviewBadge" class="inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                  Savings
+                </span>
+                <span id="customCatSelectedIconLabel" class="text-[10px] font-mono-num text-slate-400">
+                  piggy-bank
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onclick="randomizeCustomCategoryIcon()"
+            class="px-3 py-2 rounded-xl text-[11px] font-bold bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 border border-slate-700 transition-all flex items-center gap-1.5 shrink-0 shadow-sm"
+            title="Pilih Ikon Acak"
+          >
+            <i data-lucide="shuffle" class="w-3.5 h-3.5 text-purple-400"></i>
+            <span>Acak Ikon</span>
+          </button>
+        </div>
+
+        <!-- Hidden input for selected icon -->
+        <input type="hidden" id="customCatSelectedIcon" value="piggy-bank" />
+
+        <!-- 4. Pilihan Logo / Ikon Umum (Grid 48 Ikon) -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-semibold text-slate-300">
+              Pilihan Logo / Ikon Kategori
+            </label>
+            <span class="text-[10px] text-slate-400">
+              Klik ikon untuk memilih secara manual
+            </span>
+          </div>
+          <div
+            id="customCategoryIconGrid"
+            class="grid grid-cols-6 sm:grid-cols-8 gap-2 p-2.5 rounded-2xl bg-slate-950/70 border border-slate-800/90 max-h-48 overflow-y-auto"
+          >
+            <!-- Diisi secara dinamis oleh JavaScript -->
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
           <button
             type="button"
             onclick="closeAddCategoryModal()"
             data-i18n="btn_cancel"
-            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
           >
             Batal
           </button>
           <button
             type="submit"
-            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950"
+            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition-all"
           >
             <i data-lucide="plus" class="w-4 h-4 stroke-[2.5]"></i>
             <span data-i18n="btn_add">Tambahkan</span>
@@ -1704,13 +1776,13 @@
   <div id="toastContainer" class="fixed bottom-20 md:bottom-5 right-4 z-50 flex flex-col gap-2 max-w-[90vw]"></div>
 
   <!-- Scripts -->
-  <script src="js/data.js?v=17"></script>
-  <script src="js/app.js?v=17"></script>
+  <script src="js/data.js?v=19"></script>
+  <script src="js/app.js?v=19"></script>
   <script>
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((k) => {
-          if (k !== 'financetracker-pwa-v7') caches.delete(k);
+          if (k !== 'financetracker-pwa-v11') caches.delete(k);
         });
       }).catch(() => {});
     }
