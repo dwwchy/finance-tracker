@@ -7695,7 +7695,7 @@ function renderCustomCategoryIconGrid(selectedIcon) {
   if (window.lucide) window.lucide.createIcons();
 }
 
-function selectCustomCategoryIcon(iconName, isManual = false, customHint = '') {
+function selectCustomCategoryIcon(iconName, isManual = false) {
   if (isManual) {
     isManualCategoryIconSelected = true;
   }
@@ -7722,24 +7722,6 @@ function selectCustomCategoryIcon(iconName, isManual = false, customHint = '') {
     }
   });
 
-  // Update auto hint
-  const hintEl = document.getElementById('customCatAutoHint');
-  const hintText = document.getElementById('customCatAutoHintText');
-  if (hintEl && hintText) {
-    if (customHint) {
-      hintText.textContent = customHint;
-      hintEl.classList.remove('opacity-0');
-      hintEl.classList.add('opacity-100');
-    } else if (isManual) {
-      hintText.textContent = 'Pilihan Manual';
-      hintEl.classList.remove('opacity-0');
-      hintEl.classList.add('opacity-100');
-    } else {
-      hintEl.classList.remove('opacity-100');
-      hintEl.classList.add('opacity-0');
-    }
-  }
-
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -7753,7 +7735,7 @@ function randomizeCustomCategoryIcon() {
       box.style.transform = '';
     }, 220);
   }
-  selectCustomCategoryIcon(picked.icon, true, `🎲 ${picked.label}`);
+  selectCustomCategoryIcon(picked.icon, true);
 }
 
 function openAddCategoryModal(defaultType = 'Savings') {
@@ -8397,7 +8379,7 @@ function initApp() {
       if (!isManualCategoryIconSelected) {
         const type = document.getElementById('customCatType').value || 'Savings';
         const detected = detectIconFromCategoryName(name, type);
-        selectCustomCategoryIcon(detected.icon, false, detected.label ? `✨ Ikon Otomatis: ${detected.label}` : '');
+        selectCustomCategoryIcon(detected.icon, false);
       }
     });
   }
@@ -8421,7 +8403,7 @@ function initApp() {
       if (!isManualCategoryIconSelected) {
         const name = document.getElementById('customCatName').value.trim();
         const detected = detectIconFromCategoryName(name, type);
-        selectCustomCategoryIcon(detected.icon, false, detected.label ? `✨ Ikon Otomatis: ${detected.label}` : '');
+        selectCustomCategoryIcon(detected.icon, false);
       }
     });
   }
