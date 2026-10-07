@@ -1014,7 +1014,7 @@ if (typeof window !== 'undefined') {
 const defaultFinancialData = {
   settings: {
     paydayConfig: {
-      dayOfMonth: 25,
+      dayOfMonth: 1,
       salaryAmount: 5000000,
       lastUpdated: null // String "YYYY-MM"
     },

@@ -267,21 +267,13 @@
               </p>
             </div>
 
-            <div class="grid grid-cols-2 gap-2.5 w-full sm:w-auto sm:flex sm:items-center">
-              <button
-                type="button"
-                onclick="openAddWalletModal()"
-                class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 h-10 px-3 sm:px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white keep-white shadow-lg shadow-purple-500/25 transition-all text-center focus:outline-none shrink-0"
-              >
-                <i data-lucide="plus" class="w-4 h-4 stroke-[2.5] shrink-0"></i>
-                <span data-i18n="btn_add_wallet" class="truncate">Tambah Wallet</span>
-              </button>
+            <div class="w-full sm:w-auto flex items-center justify-end">
               <button
                 type="button"
                 onclick="switchTab('wallets')"
-                class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 h-10 px-3 sm:px-4 rounded-xl text-xs font-bold bg-slate-900/80 hover:bg-slate-800 text-purple-200 border border-purple-500/40 transition-all text-center focus:outline-none shrink-0"
+                class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl text-xs font-bold bg-slate-900/80 hover:bg-slate-800 active:scale-95 text-purple-200 border border-purple-500/40 transition-all text-center focus:outline-none shrink-0"
               >
-                <i data-lucide="arrow-up-right" class="w-4 h-4 shrink-0"></i>
+                <i data-lucide="arrow-up-right" class="w-4 h-4 shrink-0 text-purple-400"></i>
                 <span data-i18n="btn_manage_wallets" class="truncate">Kelola Wallet</span>
               </button>
             </div>
@@ -653,11 +645,21 @@
     <div id="tabSection-wallets" class="tab-section hidden space-y-4">
       <!-- Toolbar Filter Kategori Wallet -->
       <div class="glass-card rounded-2xl p-3.5 sm:p-4 space-y-3">
-        <div>
-          <h3 data-i18n="wallet_list_title" class="text-sm sm:text-base font-bold text-white">Daftar Penyimpanan Dana</h3>
-          <p data-i18n="wallet_list_desc" class="text-[11px] sm:text-xs text-slate-400 mt-0.5">
-            Pilih kategori untuk menampilkan rincian saldo masing-masing wallet Anda.
-          </p>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 data-i18n="wallet_list_title" class="text-sm sm:text-base font-bold text-white">Daftar Penyimpanan Dana</h3>
+            <p data-i18n="wallet_list_desc" class="text-[11px] sm:text-xs text-slate-400 mt-0.5">
+              Pilih kategori untuk menampilkan rincian saldo masing-masing wallet Anda.
+            </p>
+          </div>
+          <button
+            type="button"
+            onclick="openAddWalletModal()"
+            class="inline-flex items-center justify-center gap-2 h-10 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white keep-white shadow-lg shadow-purple-500/25 active:scale-95 transition-all text-center whitespace-nowrap self-start sm:self-auto shrink-0"
+          >
+            <i data-lucide="plus" class="w-4 h-4 stroke-[2.5] shrink-0"></i>
+            <span data-i18n="btn_add_wallet">Tambah Wallet</span>
+          </button>
         </div>
 
         <!-- Filter Pills dengan Animasi Glider Geser Interaktif (Image 2) -->
@@ -2414,13 +2416,13 @@
   <div id="toastContainer" class="fixed bottom-20 md:bottom-5 right-4 z-50 flex flex-col gap-2 max-w-[90vw]"></div>
 
   <!-- Scripts -->
-  <script src="js/data.js?v=33"></script>
-  <script src="js/app.js?v=33"></script>
+  <script src="js/data.js?v=34"></script>
+  <script src="js/app.js?v=34"></script>
   <script>
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((k) => {
-          if (k !== 'financetracker-pwa-v23') caches.delete(k);
+          if (k !== 'financetracker-pwa-v24') caches.delete(k);
         });
       }).catch(() => {});
     }

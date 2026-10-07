@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financetracker-pwa-v23';
+const CACHE_NAME = 'financetracker-pwa-v24';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

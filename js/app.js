@@ -590,14 +590,14 @@ function loadStateFromStorage() {
     const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     if (savedSettings) {
       state.settings = {
-        paydayConfig: { dayOfMonth: 25, salaryAmount: 5000000, lastUpdated: null },
+        paydayConfig: { dayOfMonth: 1, salaryAmount: 5000000, lastUpdated: null },
         reminderEnabled: true,
         reminderTime: "20:00",
         ...JSON.parse(savedSettings)
       };
     } else {
       state.settings = {
-        paydayConfig: { dayOfMonth: 25, salaryAmount: 5000000, lastUpdated: null },
+        paydayConfig: { dayOfMonth: 1, salaryAmount: 5000000, lastUpdated: null },
         reminderEnabled: true,
         reminderTime: "20:00"
       };
@@ -800,24 +800,12 @@ function isTransactionInSelectedPeriod(tx) {
   const parts = tx.date.split('-');
   const year = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10) - 1;
-  const day = parseInt(parts[2], 10);
 
   if (state.selectedMonth === -1) {
     return year === state.selectedYear;
   }
 
-  const paydayDay = (state.settings && state.settings.paydayConfig && state.settings.paydayConfig.dayOfMonth)
-    ? Number(state.settings.paydayConfig.dayOfMonth)
-    : 1;
-
-  if (paydayDay <= 1) {
-    return year === state.selectedYear && month === state.selectedMonth;
-  }
-
-  // Siklus keuangan bulanan: dari tanggal gajian ini s/d H-1 gajian bulan berikutnya
-  const cycle = getCurrentCycleDateRange(state.selectedYear, state.selectedMonth);
-  const txDateObj = new Date(year, month, day, 12, 0, 0, 0);
-  return txDateObj >= cycle.start && txDateObj <= cycle.end;
+  return year === state.selectedYear && month === state.selectedMonth;
 }
 
 function getFilteredTransactions() {
@@ -6474,7 +6462,7 @@ function renderSavingVsExpenseGauge(metrics) {
 function renderPaydayConfigUI() {
   const config = (state.settings && state.settings.paydayConfig)
     ? state.settings.paydayConfig
-    : { dayOfMonth: 25, salaryAmount: 5000000, lastUpdated: null };
+    : { dayOfMonth: 1, salaryAmount: 5000000, lastUpdated: null };
 
   const dayInput = document.getElementById('paydayDateInput');
   const amountInput = document.getElementById('paydayAmountInput');
@@ -6485,7 +6473,7 @@ function renderPaydayConfigUI() {
   const submitText = document.getElementById('btnSavePaydayText');
   const cycleLabel = document.getElementById('paydayCurrentCycleLabel');
 
-  if (dayInput && !dayInput.matches(':focus')) dayInput.value = config.dayOfMonth || 25;
+  if (dayInput && !dayInput.matches(':focus')) dayInput.value = config.dayOfMonth || 1;
   if (amountInput && !amountInput.matches(':focus')) amountInput.value = formatNumberWithDots(config.salaryAmount || 5000000);
 
   const now = new Date();
