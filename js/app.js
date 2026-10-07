@@ -1460,9 +1460,8 @@ function renderWalletsSection() {
         <div class="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-300 shadow-inner">
           <i data-lucide="wallet-cards" class="w-6 h-6"></i>
         </div>
-        <div class="space-y-1 max-w-md">
+        <div class="max-w-md">
           <h4 class="text-sm sm:text-base font-bold text-slate-100">${emptyTitle}</h4>
-          <p class="text-xs text-slate-400 leading-relaxed">${emptyDesc}</p>
         </div>
         <div class="pt-1">
           <button
@@ -7686,8 +7685,7 @@ function renderCustomCategoryIconGrid(selectedIcon) {
         class="cat-icon-choice ${isActive ? 'active' : ''}"
         title="${item.label}"
       >
-        <i data-lucide="${item.icon}" class="w-4 h-4 mb-1 pointer-events-none"></i>
-        <span class="text-[9px] truncate max-w-full font-medium leading-none pointer-events-none">${item.label}</span>
+        <i data-lucide="${item.icon}" class="w-5 h-5 pointer-events-none"></i>
       </button>
     `;
   }).join('');
@@ -7702,9 +7700,6 @@ function selectCustomCategoryIcon(iconName, isManual = false) {
 
   const hiddenInput = document.getElementById('customCatSelectedIcon');
   if (hiddenInput) hiddenInput.value = iconName;
-
-  const labelEl = document.getElementById('customCatSelectedIconLabel');
-  if (labelEl) labelEl.textContent = iconName;
 
   const previewIcon = document.getElementById('customCatPreviewIcon');
   if (previewIcon) {
