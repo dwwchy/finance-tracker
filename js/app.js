@@ -33,10 +33,14 @@ const STORAGE_KEYS = {
   DRIVE_BACKUPS: 'finance_tracker_drive_backups_v6',
   DRIVE_CLOUD_SNAPSHOTS: 'finance_tracker_cloud_snapshots_v6',
   PREFERENCES: 'finance_tracker_prefs_v6',
-  SECURITY: 'finance_tracker_security_v6'
+  SECURITY: 'finance_tracker_security_v6',
+  SETTINGS: 'finance_tracker_settings_v6',
+  EVALUATIONS: 'finance_tracker_evaluations_v6',
+  DELETED_CATEGORIES: 'finance_tracker_deleted_cats_v1'
 };
 
 let state = {
+  deletedCategories: [],
   activeTab: 'dashboard', // 'dashboard' | 'wallets' | 'income' | 'expense' | 'savings' | 'history' | 'settings'
   theme: 'dark', // 'dark' | 'light'
   currency: 'IDR', // key in CURRENCIES
@@ -45,6 +49,15 @@ let state = {
   firstOpenedMonth: new Date().getMonth(),
   selectedMonth: new Date().getMonth(),
   selectedYear: new Date().getFullYear(),
+  settings: {
+    paydayConfig: {
+      dayOfMonth: 25,
+      salaryAmount: 5000000,
+      lastUpdated: null // String "YYYY-MM"
+    },
+    reminderEnabled: true,
+    reminderTime: "20:00"
+  },
   transactions: [],
   budgets: {},
   customCategories: {
@@ -54,6 +67,15 @@ let state = {
   },
   wallets: [],
   walletTypeFilter: 'ALL',
+  evaluations: [],
+  quotes: (typeof defaultFinancialData !== 'undefined' && defaultFinancialData.quotes && defaultFinancialData.quotes.length > 0)
+    ? [...defaultFinancialData.quotes]
+    : ((typeof billionaireQuotes !== 'undefined' && billionaireQuotes.length > 0) ? [...billionaireQuotes] : []),
+  currentQuoteIndex: 0,
+  incomeQuadrantFilter: 'ALL', // 'ALL' | 1 | 2 | 3 | 4
+  expenseQuadrantFilter: 'ALL', // 'ALL' | 1 | 2 | 3 | 4
+  savingsQuadrantFilter: 'ALL', // 'ALL' | 1 | 2 | 3 | 4
+  expenseTypeFilter: 'ALL', // 'ALL' | 'needs' | 'wants'
   googleAccount: null, // { name, email, deviceLabel, connectedAt, autoBackup }
   deviceGoogleAccounts: [], // Akun Google yang terdeteksi di perangkat ini
   driveBackups: [], // Riwayat sinkronisasi cadangan transaksi ke Google Drive
@@ -347,9 +369,16 @@ function setAppLanguage(langCode) {
 
 function getActiveSchema() {
   const schema = JSON.parse(JSON.stringify(DEFAULT_FINANCE_SCHEMA));
+  const deleted = state.deletedCategories || [];
+
   ['Income', 'Expense', 'Savings'].forEach((type) => {
+    schema[type].groups.forEach((group) => {
+      group.items = group.items.filter((item) => !deleted.includes(item.name));
+    });
+
     const customs = state.customCategories[type] || [];
     customs.forEach((customItem) => {
+      if (deleted.includes(customItem.name)) return;
       const exists = schema[type].groups[0].items.some(
         (i) => i.name.toLowerCase() === customItem.name.toLowerCase()
       );
@@ -518,7 +547,12 @@ function loadStateFromStorage() {
     }
 
     const savedTx = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
-    state.transactions = savedTx ? JSON.parse(savedTx) : getInitialTransactions();
+    const rawTx = savedTx ? JSON.parse(savedTx) : getInitialTransactions();
+    state.transactions = rawTx.map((tx) => ({
+      ...tx,
+      quadrant: tx.quadrant ? Number(tx.quadrant) : 2,
+      expenseType: tx.expenseType || (tx.type === 'Expense' ? 'needs' : undefined)
+    }));
 
     const savedBudgets = localStorage.getItem(STORAGE_KEYS.BUDGETS);
     state.budgets = savedBudgets ? JSON.parse(savedBudgets) : getInitialBudgets();
@@ -533,6 +567,17 @@ function loadStateFromStorage() {
       };
     }
 
+    const savedDeletedCats = localStorage.getItem(STORAGE_KEYS.DELETED_CATEGORIES);
+    if (savedDeletedCats) {
+      try {
+        state.deletedCategories = JSON.parse(savedDeletedCats);
+      } catch (e) {
+        state.deletedCategories = [];
+      }
+    } else {
+      state.deletedCategories = [];
+    }
+
     const savedWallets = localStorage.getItem(STORAGE_KEYS.WALLETS);
     if (savedWallets) {
       state.wallets = JSON.parse(savedWallets);
@@ -540,6 +585,31 @@ function loadStateFromStorage() {
       state.wallets = JSON.parse(JSON.stringify(DEFAULT_WALLETS));
       saveWalletsToStorage();
     }
+
+    // Settings & Siklus Gaji
+    const savedSettings = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+    if (savedSettings) {
+      state.settings = {
+        paydayConfig: { dayOfMonth: 25, salaryAmount: 5000000, lastUpdated: null },
+        reminderEnabled: true,
+        reminderTime: "20:00",
+        ...JSON.parse(savedSettings)
+      };
+    } else {
+      state.settings = {
+        paydayConfig: { dayOfMonth: 25, salaryAmount: 5000000, lastUpdated: null },
+        reminderEnabled: true,
+        reminderTime: "20:00"
+      };
+    }
+    const lastSalUpdate = localStorage.getItem('lastSalaryConfigUpdate');
+    if (lastSalUpdate && state.settings.paydayConfig) {
+      state.settings.paydayConfig.lastUpdated = lastSalUpdate;
+    }
+
+    // Evaluations
+    const savedEvaluations = localStorage.getItem(STORAGE_KEYS.EVALUATIONS);
+    state.evaluations = savedEvaluations ? JSON.parse(savedEvaluations) : [];
 
     const savedGoogle = localStorage.getItem(STORAGE_KEYS.GOOGLE_ACCOUNT);
     state.googleAccount = savedGoogle ? JSON.parse(savedGoogle) : null;
@@ -577,6 +647,17 @@ function saveSecurityToStorage() {
   localStorage.setItem(STORAGE_KEYS.SECURITY, JSON.stringify(state.security));
 }
 
+function saveSettingsToStorage() {
+  localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(state.settings));
+  if (state.settings && state.settings.paydayConfig && state.settings.paydayConfig.lastUpdated) {
+    localStorage.setItem('lastSalaryConfigUpdate', state.settings.paydayConfig.lastUpdated);
+  }
+}
+
+function saveEvaluationsToStorage() {
+  localStorage.setItem(STORAGE_KEYS.EVALUATIONS, JSON.stringify(state.evaluations));
+}
+
 const PENDING_DRIVE_SYNC_KEY = 'ft_pending_drive_sync_v1';
 
 function hasPendingDriveSync() {
@@ -605,6 +686,12 @@ function saveBudgetsToStorage() {
 
 function saveCustomCategoriesToStorage() {
   localStorage.setItem(STORAGE_KEYS.CUSTOM_CATEGORIES, JSON.stringify(state.customCategories));
+  setPendingDriveSync(true);
+  triggerSilentAutoBackupIfConnected();
+}
+
+function saveDeletedCategoriesToStorage() {
+  localStorage.setItem(STORAGE_KEYS.DELETED_CATEGORIES, JSON.stringify(state.deletedCategories || []));
   setPendingDriveSync(true);
   triggerSilentAutoBackupIfConnected();
 }
@@ -674,14 +761,63 @@ function getCalculatedWallets() {
 
 // ================= FILTER & KALKULASI METRIK =================
 
+function getCurrentCycleDateRange(year = state.selectedYear, month = state.selectedMonth) {
+  const paydayDay = (state.settings && state.settings.paydayConfig && state.settings.paydayConfig.dayOfMonth)
+    ? Number(state.settings.paydayConfig.dayOfMonth)
+    : 1;
+
+  if (month === -1) {
+    return {
+      start: new Date(year, 0, 1),
+      end: new Date(year, 11, 31, 23, 59, 59),
+      label: `${t('all_months_1_year')} ${year}`
+    };
+  }
+
+  if (paydayDay <= 1) {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0, 23, 59, 59);
+    return {
+      start: firstDay,
+      end: lastDay,
+      label: `${firstDay.toLocaleDateString(getActiveLocale(), { day: 'numeric', month: 'short' })} – ${lastDay.toLocaleDateString(getActiveLocale(), { day: 'numeric', month: 'short', year: 'numeric' })}`
+    };
+  }
+
+  const cycleStart = new Date(year, month, paydayDay, 0, 0, 0, 0);
+  const nextPayday = new Date(year, month + 1, paydayDay, 0, 0, 0, 0);
+  const cycleEnd = new Date(nextPayday.getTime() - 1);
+
+  return {
+    start: cycleStart,
+    end: cycleEnd,
+    label: `${cycleStart.toLocaleDateString(getActiveLocale(), { day: 'numeric', month: 'short' })} – ${cycleEnd.toLocaleDateString(getActiveLocale(), { day: 'numeric', month: 'short', year: 'numeric' })}`
+  };
+}
+
 function isTransactionInSelectedPeriod(tx) {
   if (!tx.date) return false;
   const parts = tx.date.split('-');
   const year = parseInt(parts[0], 10);
   const month = parseInt(parts[1], 10) - 1;
-  const matchYear = year === state.selectedYear;
-  const matchMonth = state.selectedMonth === -1 ? true : month === state.selectedMonth;
-  return matchYear && matchMonth;
+  const day = parseInt(parts[2], 10);
+
+  if (state.selectedMonth === -1) {
+    return year === state.selectedYear;
+  }
+
+  const paydayDay = (state.settings && state.settings.paydayConfig && state.settings.paydayConfig.dayOfMonth)
+    ? Number(state.settings.paydayConfig.dayOfMonth)
+    : 1;
+
+  if (paydayDay <= 1) {
+    return year === state.selectedYear && month === state.selectedMonth;
+  }
+
+  // Siklus keuangan bulanan: dari tanggal gajian ini s/d H-1 gajian bulan berikutnya
+  const cycle = getCurrentCycleDateRange(state.selectedYear, state.selectedMonth);
+  const txDateObj = new Date(year, month, day, 12, 0, 0, 0);
+  return txDateObj >= cycle.start && txDateObj <= cycle.end;
 }
 
 function getFilteredTransactions() {
@@ -836,10 +972,10 @@ function switchTab(tabName) {
         if (tabName === 'savings') activeColor = 'text-blue-400';
         if (tabName === 'wallets') activeColor = 'text-purple-400';
         if (tabName === 'settings') activeColor = 'text-blue-400';
-        btn.className = `mobile-tab-btn tab-btn-active flex flex-col items-center justify-center py-2 px-1 ${activeColor} font-bold transition-all`;
+        btn.className = `mobile-tab-btn tab-btn-active ${activeColor} font-bold`;
       } else {
         btn.className =
-          'mobile-tab-btn flex flex-col items-center justify-center py-2 px-1 text-slate-400 hover:text-slate-200 font-semibold transition-all';
+          'mobile-tab-btn text-slate-400 hover:text-slate-200 font-semibold';
       }
     }
   });
@@ -851,8 +987,12 @@ function switchTab(tabName) {
       });
     }, 50);
   } else if (tabName === 'wallets') {
+    renderQuotesCard();
     requestAnimationFrame(() => {
-      if (typeof updateWalletFilterGlider === 'function') updateWalletFilterGlider();
+      if (typeof updateWalletFilterGlider === 'function') {
+        updateWalletFilterGlider(true);
+        setTimeout(() => updateWalletFilterGlider(true), 60);
+      }
     });
   }
 
@@ -1040,10 +1180,13 @@ function renderHeaderCards(metrics) {
 
 const WALLET_FILTER_TABS = ['ALL', 'Bank', 'Tunai', 'E-Wallet'];
 
-function updateWalletFilterGlider() {
+function updateWalletFilterGlider(immediate = false) {
   const container = document.getElementById('walletFilterContainer');
   const glider = document.getElementById('walletFilterGlider');
   if (!container || !glider) return;
+
+  const walletTab = document.getElementById('tabSection-wallets');
+  if (walletTab && walletTab.classList.contains('hidden')) return;
 
   const activeBtn = container.querySelector(`[data-wallet-filter="${state.walletTypeFilter || 'ALL'}"]`);
   if (!activeBtn) return;
@@ -1051,20 +1194,32 @@ function updateWalletFilterGlider() {
   const containerRect = container.getBoundingClientRect();
   const btnRect = activeBtn.getBoundingClientRect();
 
-  if (btnRect.width === 0) return;
+  if (btnRect.width === 0) {
+    requestAnimationFrame(() => updateWalletFilterGlider(immediate));
+    return;
+  }
 
   const left = btnRect.left - containerRect.left;
   const width = btnRect.width;
 
-  glider.style.left = `${left}px`;
-  glider.style.width = `${width}px`;
-  glider.style.opacity = '1';
+  if (immediate) {
+    glider.style.transition = 'none';
+    glider.style.transform = `translateX(${left}px)`;
+    glider.style.width = `${width}px`;
+    glider.style.opacity = '1';
+    void glider.offsetWidth;
+    glider.style.transition = 'transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), width 0.32s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease';
+  } else {
+    glider.style.transform = `translateX(${left}px)`;
+    glider.style.width = `${width}px`;
+    glider.style.opacity = '1';
+  }
 }
 
 function setWalletTypeFilter(filterType) {
   state.walletTypeFilter = filterType || 'ALL';
   renderWalletsSection();
-  updateWalletFilterGlider();
+  updateWalletFilterGlider(false);
   if (window.lucide) window.lucide.createIcons();
 }
 
@@ -1686,7 +1841,7 @@ function buildCategoryDesktopRowHTML(item, tracked, budget, type) {
             </button>
             <button
               onclick="clearCategoryNominal('${type}', '${escapedName}', ${item.isCustom ? `'${item.id}'` : 'null'})"
-              title="${t('btn_reset')} ${displayCatName}"
+              title="${(item.name === 'Tabungan Pendidikan' || item.isCustom) ? 'Hapus' : t('btn_reset')} ${displayCatName}"
               class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-300 border border-rose-500/25 transition-all text-xs"
             >
               <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
@@ -1824,7 +1979,7 @@ function buildCategoryMobileCardHTML(item, tracked, budget, type) {
           <button
             onclick="clearCategoryNominal('${type}', '${escapedName}', ${item.isCustom ? `'${item.id}'` : 'null'})"
             class="p-2 rounded-lg bg-rose-500/10 active:bg-rose-500/25 text-rose-300 border border-rose-500/25"
-            title="${t('btn_reset')} ${displayCatName}"
+            title="${(item.name === 'Tabungan Pendidikan' || item.isCustom) ? 'Hapus' : t('btn_reset')} ${displayCatName}"
           >
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
           </button>
@@ -1901,34 +2056,67 @@ function buildTableFooterHTML(label, totalTracked, totalBudget, type) {
 
 function renderBreakdownTables(metrics) {
   const schema = getActiveSchema();
-  const { trackedByCategory, cumulativeSavingsByCategory, totalIncome } = metrics;
+  const filteredTx = getFilteredTransactions();
 
-  // 1. INCOME
+  // 1. INCOME dengan Filter Kuadran
   let incomeDesktopHTML = '';
   let incomeMobileHTML = '';
   let incTotalTracked = 0;
 
+  const incTxFiltered = filteredTx.filter((tx) => {
+    if (tx.type !== 'Income') return false;
+    if (state.incomeQuadrantFilter !== 'ALL' && Number(tx.quadrant || 2) !== Number(state.incomeQuadrantFilter)) {
+      return false;
+    }
+    return true;
+  });
+
+  const incTrackedByCat = {};
+  incTxFiltered.forEach((tx) => {
+    const amt = Number(tx.amount) || 0;
+    incTrackedByCat[tx.category] = (incTrackedByCat[tx.category] || 0) + amt;
+  });
+
+  const totalFilteredIncome = incTxFiltered.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+
   schema.Income.groups.forEach((group) => {
     group.items.forEach((item) => {
-      const tracked = trackedByCategory[item.name] || 0;
+      const tracked = incTrackedByCat[item.name] || 0;
       incTotalTracked += tracked;
-      incomeDesktopHTML += buildIncomeDesktopRowHTML(item, tracked, totalIncome);
-      incomeMobileHTML += buildIncomeMobileCardHTML(item, tracked, totalIncome);
+      incomeDesktopHTML += buildIncomeDesktopRowHTML(item, tracked, totalFilteredIncome || metrics.totalIncome);
+      incomeMobileHTML += buildIncomeMobileCardHTML(item, tracked, totalFilteredIncome || metrics.totalIncome);
     });
   });
   incomeDesktopHTML += buildIncomeTableFooterHTML(incTotalTracked);
   document.getElementById('tbodyIncome').innerHTML = incomeDesktopHTML;
   document.getElementById('mobileCardsIncome').innerHTML = incomeMobileHTML;
 
-  // 2. EXPENSES
+  // 2. EXPENSES dengan Filter Kuadran & Needs vs Wants
   let expenseDesktopHTML = '';
   let expenseMobileHTML = '';
   let expTotalTracked = 0;
   let expTotalBudget = 0;
 
+  const expTxFiltered = filteredTx.filter((tx) => {
+    if (tx.type !== 'Expense') return false;
+    if (state.expenseQuadrantFilter !== 'ALL' && Number(tx.quadrant || 2) !== Number(state.expenseQuadrantFilter)) {
+      return false;
+    }
+    if (state.expenseTypeFilter !== 'ALL' && (tx.expenseType || 'needs') !== state.expenseTypeFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  const expTrackedByCat = {};
+  expTxFiltered.forEach((tx) => {
+    const amt = Number(tx.amount) || 0;
+    expTrackedByCat[tx.category] = (expTrackedByCat[tx.category] || 0) + amt;
+  });
+
   schema.Expense.groups.forEach((group) => {
     group.items.forEach((item) => {
-      const tracked = trackedByCategory[item.name] || 0;
+      const tracked = expTrackedByCat[item.name] || 0;
       const budget = getCategoryBudget(item.name);
       expTotalTracked += tracked;
       expTotalBudget += budget;
@@ -1941,15 +2129,36 @@ function renderBreakdownTables(metrics) {
   document.getElementById('tbodyExpense').innerHTML = expenseDesktopHTML;
   document.getElementById('mobileCardsExpense').innerHTML = expenseMobileHTML;
 
-  // 3. SAVINGS
+  // 3. SAVINGS dengan Filter Kuadran
   let savingsDesktopHTML = '';
   let savingsMobileHTML = '';
   let savTotalTracked = 0;
   let savTotalBudget = 0;
 
+  const savTrackedByCat = {};
+  state.transactions.forEach((tx) => {
+    if (tx.type !== 'Savings' || !tx.date) return;
+    if (state.savingsQuadrantFilter !== 'ALL' && Number(tx.quadrant || 2) !== Number(state.savingsQuadrantFilter)) {
+      return false;
+    }
+    const parts = tx.date.split('-');
+    const txYear = parseInt(parts[0], 10);
+    const txMonth = parseInt(parts[1], 10) - 1;
+    const isUpToPeriod =
+      state.selectedMonth === -1
+        ? txYear <= state.selectedYear
+        : txYear < state.selectedYear ||
+          (txYear === state.selectedYear && txMonth <= state.selectedMonth);
+
+    if (isUpToPeriod) {
+      const amt = Number(tx.amount) || 0;
+      savTrackedByCat[tx.category] = (savTrackedByCat[tx.category] || 0) + amt;
+    }
+  });
+
   schema.Savings.groups.forEach((group) => {
     group.items.forEach((item) => {
-      const tracked = cumulativeSavingsByCategory[item.name] || 0;
+      const tracked = savTrackedByCat[item.name] || 0;
       const budget = item.noBudget ? 0 : getCategoryBudget(item.name);
       savTotalTracked += tracked;
       if (!item.noBudget) savTotalBudget += budget;
@@ -1962,9 +2171,43 @@ function renderBreakdownTables(metrics) {
   document.getElementById('mobileCardsSavings').innerHTML = savingsMobileHTML;
 }
 
-// ================= AKSI HAPUS NOMINAL DI SEMUA TAB =================
+function deleteCategoryCompletely(type, categoryName, customId = null) {
+  if (!state.deletedCategories) state.deletedCategories = [];
+  if (!state.deletedCategories.includes(categoryName)) {
+    state.deletedCategories.push(categoryName);
+  }
+  saveDeletedCategoriesToStorage();
+
+  if (customId && state.customCategories && state.customCategories[type]) {
+    state.customCategories[type] = state.customCategories[type].filter(
+      (c) => c.id !== customId && c.name !== categoryName
+    );
+    saveCustomCategoriesToStorage();
+  }
+
+  // Bersihkan semua transaksi terkait kategori ini
+  state.transactions = state.transactions.filter((tx) => tx.category !== categoryName);
+  saveTransactionsToStorage();
+
+  // Bersihkan budget terkait kategori ini
+  Object.keys(state.budgets).forEach((k) => {
+    if (k.endsWith(`::${categoryName}`)) {
+      delete state.budgets[k];
+    }
+  });
+  saveBudgetsToStorage();
+
+  refreshDashboard();
+  showToast(`Kategori "${categoryName}" berhasil dihapus.`, 'emerald');
+}
 
 function clearCategoryNominal(type, categoryName, customId = null) {
+  // Tabungan Pendidikan dibuat dapat dihapus sepenuhnya sesuai permintaan pengguna
+  if (categoryName === 'Tabungan Pendidikan' || categoryName.toLowerCase().includes('tabungan pendidikan')) {
+    deleteCategoryCompletely(type, categoryName, customId);
+    return;
+  }
+
   let removedCount = 0;
 
   if (type === 'Savings') {
@@ -2014,7 +2257,7 @@ function clearCategoryNominal(type, categoryName, customId = null) {
   }
 
   if (customId) {
-    deleteCustomCategory(type, customId, categoryName);
+    deleteCategoryCompletely(type, categoryName, customId);
     return;
   }
 
@@ -2346,6 +2589,18 @@ function buildTxItemCardHTML(tx) {
     sign = '';
   }
 
+  const qNum = Number(tx.quadrant) || 2;
+  const qDotColors = { 1: 'bg-rose-500', 2: 'bg-amber-500', 3: 'bg-slate-400', 4: 'bg-blue-500' };
+  const qLabel = t('quadrant_' + qNum);
+  const qBadgeHTML = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border badge-q${qNum}" title="${qLabel}"><span class="w-1.5 h-1.5 rounded-full ${qDotColors[qNum] || 'bg-amber-500'}"></span>${qLabel}</span>`;
+
+  let expenseTypeHTML = '';
+  if (tx.type === 'Expense') {
+    const isWants = tx.expenseType === 'wants';
+    const etLabel = t(isWants ? 'badge_wants' : 'badge_needs');
+    expenseTypeHTML = `<span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${isWants ? 'badge-wants' : 'badge-needs'}">${etLabel}</span>`;
+  }
+
   const formattedDate = new Date(tx.date + 'T00:00:00').toLocaleDateString(getActiveLocale(), {
     day: '2-digit',
     month: 'short',
@@ -2358,9 +2613,11 @@ function buildTxItemCardHTML(tx) {
   return `
     <div class="p-3.5 rounded-xl bg-slate-900/65 border border-slate-800/90 flex items-center justify-between gap-3">
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2 mb-1">
+        <div class="flex items-center gap-1.5 mb-1 flex-wrap">
           <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}">${displayType}</span>
-          <span class="text-[11px] font-mono-num text-slate-400">${formattedDate}</span>
+          ${qBadgeHTML}
+          ${expenseTypeHTML}
+          <span class="text-[11px] font-mono-num text-slate-400 ml-auto sm:ml-0">${formattedDate}</span>
         </div>
         <div class="text-sm font-semibold text-slate-100 truncate">${displayCategory}</div>
         <div class="text-xs text-slate-400 truncate">
@@ -2466,6 +2723,18 @@ function renderTransactionHistory(filteredTx) {
         sign = '';
       }
 
+      const qNum = Number(tx.quadrant) || 2;
+      const qDotColors = { 1: 'bg-rose-500', 2: 'bg-amber-500', 3: 'bg-slate-400', 4: 'bg-blue-500' };
+      const qLabel = t('quadrant_' + qNum);
+      const qBadgeHTML = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border badge-q${qNum}" title="${qLabel}"><span class="w-1.5 h-1.5 rounded-full ${qDotColors[qNum] || 'bg-amber-500'}"></span>${qLabel}</span>`;
+
+      let expenseTypeHTML = '';
+      if (tx.type === 'Expense') {
+        const isWants = tx.expenseType === 'wants';
+        const etLabel = t(isWants ? 'badge_wants' : 'badge_needs');
+        expenseTypeHTML = `<span class="px-1.5 py-0.5 rounded-full text-[9px] font-semibold border ${isWants ? 'badge-wants' : 'badge-needs'}">${etLabel}</span>`;
+      }
+
       const formattedDate = new Date(tx.date + 'T00:00:00').toLocaleDateString(getActiveLocale(), {
         day: '2-digit',
         month: 'short',
@@ -2475,7 +2744,13 @@ function renderTransactionHistory(filteredTx) {
       return `
         <tr class="hover:bg-slate-800/35 transition-colors">
           <td class="py-3 pl-4 pr-3 whitespace-nowrap text-xs font-mono-num text-slate-300">${formattedDate}</td>
-          <td class="py-3 px-3 whitespace-nowrap">${badgeHTML}</td>
+          <td class="py-3 px-3 whitespace-nowrap">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              ${badgeHTML}
+              ${qBadgeHTML}
+              ${expenseTypeHTML}
+            </div>
+          </td>
           <td class="py-3 px-3">
             <div class="text-sm font-medium text-slate-100">${displayCategory}</div>
             ${tx.note ? `<div class="text-xs text-slate-400 mt-0.5">${tx.note}</div>` : ''}
@@ -4411,7 +4686,7 @@ function saveCloudSnapshotForEmail(email, snapshotData) {
 function buildFullTransactionBackupPayload() {
   return {
     app: 'FinanceTracker',
-    version: 6,
+    version: 7,
     backedUpAt: new Date().toISOString(),
     googleAccount: state.googleAccount,
     firstOpenedYear: state.firstOpenedYear,
@@ -4422,7 +4697,9 @@ function buildFullTransactionBackupPayload() {
     transactions: state.transactions,
     budgets: state.budgets,
     customCategories: state.customCategories,
-    wallets: state.wallets
+    wallets: state.wallets,
+    settings: state.settings,
+    evaluations: state.evaluations
   };
 }
 
@@ -4647,6 +4924,14 @@ function restoreFromSnapshotObject(snapshot) {
   }
   if (Array.isArray(snapshot.wallets)) {
     state.wallets = snapshot.wallets;
+  }
+  if (snapshot.settings && typeof snapshot.settings === 'object') {
+    state.settings = { ...state.settings, ...snapshot.settings };
+    saveSettingsToStorage();
+  }
+  if (Array.isArray(snapshot.evaluations)) {
+    state.evaluations = snapshot.evaluations;
+    saveEvaluationsToStorage();
   }
   if (typeof snapshot.firstOpenedYear === 'number') {
     state.firstOpenedYear = snapshot.firstOpenedYear;
@@ -6131,6 +6416,802 @@ function setupSingleCustomSelect(selectEl) {
   });
 }
 
+// ================= WIDGET: SAVING VS EXPENSE GAUGE =================
+
+function renderSavingVsExpenseGauge(metrics) {
+  const totalSavings = metrics.totalSavings || 0;
+  const totalExpense = metrics.totalExpense || 0;
+
+  let ratio = 0;
+  if (totalExpense > 0) {
+    ratio = Math.round((totalSavings / totalExpense) * 100);
+  } else if (totalSavings > 0) {
+    ratio = 100;
+  }
+
+  const clampedCircle = Math.min(100, Math.max(0, ratio));
+  const circleEl = document.getElementById('gaugeSavingCircle');
+  if (circleEl) {
+    circleEl.setAttribute('stroke-dasharray', `${clampedCircle}, 100`);
+    if (ratio >= 50) {
+      circleEl.setAttribute('class', 'gauge-ring-circle text-teal-400');
+    } else if (ratio >= 20) {
+      circleEl.setAttribute('class', 'gauge-ring-circle text-emerald-400');
+    } else {
+      circleEl.setAttribute('class', 'gauge-ring-circle text-amber-400');
+    }
+  }
+
+  const pctEl = document.getElementById('gaugeSavingPct');
+  if (pctEl) pctEl.textContent = `${ratio}%`;
+
+  const totalSavEl = document.getElementById('gaugeTotalSavings');
+  if (totalSavEl) totalSavEl.textContent = formatRp(totalSavings);
+
+  const totalExpEl = document.getElementById('gaugeTotalExpense');
+  if (totalExpEl) totalExpEl.textContent = formatRp(totalExpense);
+
+  const statusTextEl = document.getElementById('gaugeStatusText');
+  const badgeStatusEl = document.getElementById('gaugeBadgeStatus');
+  const adviceEl = document.getElementById('gaugeAdviceText');
+
+  if (ratio >= 50) {
+    if (statusTextEl) statusTextEl.textContent = t('gauge_healthy') || 'Sangat Sehat';
+    if (badgeStatusEl) badgeStatusEl.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30 w-fit';
+    if (adviceEl) adviceEl.textContent = t('gauge_advice_healthy') || 'Luar biasa! Rasio tabungan Anda berada di atas 50%, disiplin keuangan sangat prima.';
+  } else if (ratio >= 20) {
+    if (statusTextEl) statusTextEl.textContent = t('gauge_good') || 'Cukup Baik';
+    if (badgeStatusEl) badgeStatusEl.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 w-fit';
+    if (adviceEl) adviceEl.textContent = t('gauge_advice_standard') || 'Rasio tabungan ideal minimal 20% dari total penghasilan/pengeluaran Anda.';
+  } else {
+    if (statusTextEl) statusTextEl.textContent = t('gauge_warning') || 'Perlu Perhatian';
+    if (badgeStatusEl) badgeStatusEl.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 w-fit';
+    if (adviceEl) adviceEl.textContent = t('gauge_advice_low') || 'Tingkatkan alokasi tabungan dan pangkas pos pengeluaran sekunder (Wants).';
+  }
+}
+
+// ================= FORM SIKLUS GAJI & PENGHASILAN BULANAN =================
+
+function renderPaydayConfigUI() {
+  const config = (state.settings && state.settings.paydayConfig)
+    ? state.settings.paydayConfig
+    : { dayOfMonth: 25, salaryAmount: 5000000, lastUpdated: null };
+
+  const dayInput = document.getElementById('paydayDateInput');
+  const amountInput = document.getElementById('paydayAmountInput');
+  const lockedNotice = document.getElementById('paydayLockedNotice');
+  const badgeEl = document.getElementById('salaryCycleStatusBadge');
+  const badgeText = document.getElementById('salaryCycleStatusText');
+  const submitBtn = document.getElementById('btnSavePaydayConfig');
+  const submitText = document.getElementById('btnSavePaydayText');
+  const cycleLabel = document.getElementById('paydayCurrentCycleLabel');
+
+  if (dayInput && !dayInput.matches(':focus')) dayInput.value = config.dayOfMonth || 25;
+  if (amountInput && !amountInput.matches(':focus')) amountInput.value = formatNumberWithDots(config.salaryAmount || 5000000);
+
+  const now = new Date();
+  const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const lastUpdated = config.lastUpdated || localStorage.getItem('lastSalaryConfigUpdate');
+  const isLocked = lastUpdated === currentYM;
+
+  if (cycleLabel) {
+    const cycleRange = getCurrentCycleDateRange(now.getFullYear(), now.getMonth());
+    cycleLabel.textContent = `Siklus Periode: ${cycleRange.label}`;
+  }
+
+  if (isLocked) {
+    if (dayInput) dayInput.disabled = true;
+    if (amountInput) amountInput.disabled = true;
+    if (lockedNotice) lockedNotice.classList.remove('hidden');
+    if (badgeEl) {
+      badgeEl.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 w-fit';
+    }
+    if (badgeText) badgeText.textContent = t('salary_cycle_locked') || 'Terkunci';
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.className = 'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-80';
+    }
+    if (submitText) submitText.textContent = t('salary_locked_btn') || 'Terkunci Bulan Ini';
+    const icon = document.getElementById('btnSavePaydayIcon');
+    if (icon) icon.setAttribute('data-lucide', 'lock');
+  } else {
+    if (dayInput) dayInput.disabled = false;
+    if (amountInput) amountInput.disabled = false;
+    if (lockedNotice) lockedNotice.classList.add('hidden');
+    if (badgeEl) {
+      badgeEl.className = 'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 w-fit';
+    }
+    if (badgeText) badgeText.textContent = t('salary_cycle_unlocked') || 'Dapat Diubah';
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.className = 'inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20 transition-all focus:outline-none';
+    }
+    if (submitText) submitText.textContent = t('salary_save_btn') || 'Simpan Siklus Gaji';
+    const icon = document.getElementById('btnSavePaydayIcon');
+    if (icon) icon.setAttribute('data-lucide', 'save');
+  }
+}
+
+function handlePaydayConfigSubmit(e) {
+  e.preventDefault();
+  const now = new Date();
+  const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const config = state.settings.paydayConfig;
+  const lastUpdated = config.lastUpdated || localStorage.getItem('lastSalaryConfigUpdate');
+
+  if (lastUpdated === currentYM) {
+    showToast(t('salary_locked_notice'), 'warning');
+    return;
+  }
+
+  const dayInput = document.getElementById('paydayDateInput');
+  const amountInput = document.getElementById('paydayAmountInput');
+  const day = parseInt(dayInput.value, 10);
+  const amount = parseFormattedNumber(amountInput.value);
+
+  if (!day || day < 1 || day > 31) {
+    showToast('Tanggal gajian harus antara 1 sampai 31.', 'error');
+    return;
+  }
+  if (!amount || amount <= 0) {
+    showToast('Nominal gaji harus lebih dari 0.', 'error');
+    return;
+  }
+
+  state.settings.paydayConfig = {
+    dayOfMonth: day,
+    salaryAmount: amount,
+    lastUpdated: currentYM
+  };
+  localStorage.setItem('lastSalaryConfigUpdate', currentYM);
+  saveSettingsToStorage();
+  renderPaydayConfigUI();
+  refreshDashboard();
+  showToast(`${t('salary_cycle_title')} berhasil disimpan!`, 'success');
+}
+
+// ================= DYNAMIC QUOTES CARD =================
+
+function getActiveQuotesList() {
+  if (state.quotes && state.quotes.length > 0) return state.quotes;
+  if (typeof defaultFinancialData !== 'undefined' && defaultFinancialData.quotes && defaultFinancialData.quotes.length > 0) return defaultFinancialData.quotes;
+  if (typeof billionaireQuotes !== 'undefined' && billionaireQuotes.length > 0) return billionaireQuotes;
+  return [];
+}
+
+let quotesIntervalTimer = null;
+
+function renderQuotesCard() {
+  const quotes = getActiveQuotesList();
+  if (!quotes || quotes.length === 0) return;
+  const quote = quotes[state.currentQuoteIndex % quotes.length];
+
+  const textEls = document.querySelectorAll('.quote-text-el, #quoteText');
+  const authorEls = document.querySelectorAll('.quote-author-el, #quoteAuthor');
+  const wrappers = document.querySelectorAll('.quote-wrapper-el, #quoteContentWrapper');
+
+  wrappers.forEach((wrapper) => {
+    wrapper.classList.remove('quote-fade-in');
+    void wrapper.offsetWidth;
+    wrapper.classList.add('quote-fade-in');
+  });
+
+  textEls.forEach((el) => {
+    el.textContent = `"${quote.text}"`;
+  });
+  authorEls.forEach((el) => {
+    el.textContent = `— ${quote.author}`;
+  });
+}
+
+function initQuotesRotation() {
+  const quotes = getActiveQuotesList();
+  if (!quotes || quotes.length === 0) return;
+  state.currentQuoteIndex = Math.floor(Math.random() * quotes.length);
+  renderQuotesCard();
+
+  if (quotesIntervalTimer) {
+    clearInterval(quotesIntervalTimer);
+  }
+  // Auto-rotasi mengalir otomatis setiap 12 detik
+  quotesIntervalTimer = setInterval(() => {
+    if (document.hidden) return;
+    nextQuote();
+  }, 12000);
+}
+
+function nextQuote() {
+  const quotes = getActiveQuotesList();
+  if (!quotes || quotes.length === 0) return;
+  state.currentQuoteIndex = (state.currentQuoteIndex + 1) % quotes.length;
+  renderQuotesCard();
+}
+
+if (typeof window !== 'undefined') {
+  window.nextQuote = nextQuote;
+  window.renderQuotesCard = renderQuotesCard;
+}
+
+// ================= FILTER KUADRAN EISENHOWER & NEEDS/WANTS =================
+
+function setIncomeQuadrantFilter(q) {
+  state.incomeQuadrantFilter = q;
+  document.querySelectorAll('#incomeQuadrantFilterGroup button').forEach((btn) => {
+    const bq = btn.getAttribute('data-iq-filter');
+    if (bq == q) {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950 transition-all flex items-center justify-center';
+    } else {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 bg-slate-900/60 border border-slate-800 transition-all flex items-center justify-center';
+    }
+  });
+  renderBreakdownTables(calculateSummaryMetrics(getFilteredTransactions()));
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function setExpenseQuadrantFilter(q) {
+  state.expenseQuadrantFilter = q;
+  document.querySelectorAll('#expenseQuadrantFilterGroup button').forEach((btn) => {
+    const bq = btn.getAttribute('data-eq-filter');
+    if (bq == q) {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500 text-white transition-all flex items-center justify-center';
+    } else {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 bg-slate-900/60 border border-slate-800 transition-all flex items-center justify-center';
+    }
+  });
+  renderBreakdownTables(calculateSummaryMetrics(getFilteredTransactions()));
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function setExpenseTypeFilter(type) {
+  state.expenseTypeFilter = type;
+  document.querySelectorAll('#expenseTypeFilterGroup button').forEach((btn) => {
+    const bt = btn.getAttribute('data-et-filter');
+    if (bt === type) {
+      btn.className = 'px-3 py-1 rounded-xl text-xs font-bold bg-rose-500 text-white transition-all';
+    } else {
+      btn.className = 'px-3 py-1 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 bg-slate-900/60 border border-slate-800 transition-all';
+    }
+  });
+  renderBreakdownTables(calculateSummaryMetrics(getFilteredTransactions()));
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function setSavingsQuadrantFilter(q) {
+  state.savingsQuadrantFilter = q;
+  document.querySelectorAll('#savingsQuadrantFilterGroup button').forEach((btn) => {
+    const bq = btn.getAttribute('data-sq-filter');
+    if (bq == q) {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-500 text-white transition-all flex items-center justify-center';
+    } else {
+      btn.className = 'px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200 bg-slate-900/60 border border-slate-800 transition-all flex items-center justify-center';
+    }
+  });
+  renderBreakdownTables(calculateSummaryMetrics(getFilteredTransactions()));
+  if (window.lucide) window.lucide.createIcons();
+}
+
+// ================= MODAL EVALUASI KEUANGAN OTOMATIS =================
+
+let activeEvaluationContext = null;
+
+function checkAutoEvaluationTrigger() {
+  const now = new Date();
+  const todayDay = now.getDate();
+  const paydayDay = Number(state.settings?.paydayConfig?.dayOfMonth || 25);
+
+  if (todayDay !== 1 && todayDay !== paydayDay) {
+    return;
+  }
+
+  const triggerKey = `finance_eval_prompted_${now.getFullYear()}_${now.getMonth() + 1}_day${todayDay}`;
+  if (localStorage.getItem(triggerKey)) {
+    return;
+  }
+
+  let prevYear = now.getFullYear();
+  let prevMonth = now.getMonth() - 1;
+  if (prevMonth < 0) {
+    prevMonth = 11;
+    prevYear -= 1;
+  }
+
+  const prevCycle = getCurrentCycleDateRange(prevYear, prevMonth);
+  const prevTx = state.transactions.filter((tx) => {
+    if (!tx.date) return false;
+    const parts = tx.date.split('-');
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    const txObj = new Date(y, m - 1, d, 12, 0, 0, 0);
+    return txObj >= prevCycle.start && txObj <= prevCycle.end;
+  });
+
+  let prevIncome = 0;
+  let prevExpense = 0;
+  let prevSavings = 0;
+
+  prevTx.forEach((tx) => {
+    const amt = Number(tx.amount) || 0;
+    if (tx.type === 'Income') prevIncome += amt;
+    else if (tx.type === 'Expense') prevExpense += amt;
+    else if (tx.type === 'Savings') prevSavings += amt;
+  });
+
+  let prevBudget = 0;
+  const schema = getActiveSchema();
+  schema.Expense.groups.forEach((g) =>
+    g.items.forEach((i) => {
+      if (!i.noBudget) {
+        prevBudget += Number(state.budgets[makeBudgetKey(i.name, prevYear, prevMonth)]) || 0;
+      }
+    })
+  );
+
+  const isOverbudget = prevBudget > 0 && prevExpense > prevBudget;
+  const diff = Math.abs(prevExpense - prevBudget);
+  const savingRatio = prevIncome > 0
+    ? Math.round((prevSavings / prevIncome) * 100)
+    : (prevExpense > 0 ? Math.round((prevSavings / prevExpense) * 100) : 0);
+
+  setTimeout(() => {
+    openEvaluationModal({
+      year: prevYear,
+      month: prevMonth,
+      cycleLabel: prevCycle.label,
+      income: prevIncome,
+      expense: prevExpense,
+      budget: prevBudget,
+      savings: prevSavings,
+      isOverbudget,
+      diff,
+      savingRatio,
+      triggerKey
+    });
+  }, 1200);
+}
+
+function openEvaluationModal(evalData) {
+  activeEvaluationContext = evalData;
+
+  const subtitle = document.getElementById('evalModalPeriodSubtitle');
+  if (subtitle) subtitle.textContent = `Analisis Siklus: ${evalData.cycleLabel}`;
+
+  const statusBadge = document.getElementById('evalStatusBadge');
+  const statusText = document.getElementById('evalStatusText');
+  const diffAmount = document.getElementById('evalDiffAmount');
+
+  if (evalData.isOverbudget) {
+    if (statusBadge) statusBadge.className = 'mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30 w-fit';
+    if (statusText) statusText.textContent = t('eval_status_overbudget') || 'Overbudget (Melebihi Anggaran)';
+    if (diffAmount) diffAmount.textContent = `Defisit ${formatRp(evalData.diff)}`;
+  } else {
+    if (statusBadge) statusBadge.className = 'mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 w-fit';
+    if (statusText) statusText.textContent = t('eval_status_underbudget') || 'Underbudget (Terkendali / Hemat)';
+    if (diffAmount) diffAmount.textContent = `Hemat ${formatRp(evalData.diff)}`;
+  }
+
+  const ratioEl = document.getElementById('evalSavingRatio');
+  if (ratioEl) ratioEl.textContent = `${evalData.savingRatio}%`;
+
+  const incEl = document.getElementById('evalTotalIncome');
+  if (incEl) incEl.textContent = formatRp(evalData.income);
+
+  const expEl = document.getElementById('evalTotalExpense');
+  if (expEl) expEl.textContent = formatRp(evalData.expense);
+
+  const budEl = document.getElementById('evalTotalBudget');
+  if (budEl) budEl.textContent = formatRp(evalData.budget);
+
+  const savEl = document.getElementById('evalTotalSavings');
+  if (savEl) savEl.textContent = formatRp(evalData.savings);
+
+  const notesInput = document.getElementById('evalNotesInput');
+  if (notesInput) notesInput.value = '';
+
+  const modal = document.getElementById('evaluationModal');
+  if (modal) {
+    modal.classList.remove('hidden');
+    requestAnimationFrame(() => modal.classList.add('modal-open'));
+  }
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeEvaluationModal() {
+  const modal = document.getElementById('evaluationModal');
+  if (modal) {
+    modal.classList.remove('modal-open');
+    setTimeout(() => modal.classList.add('hidden'), 200);
+  }
+}
+
+function handleEvaluationSubmit(e) {
+  e.preventDefault();
+  const notesInput = document.getElementById('evalNotesInput');
+  const notes = notesInput ? notesInput.value.trim() : '';
+
+  if (!notes || notes.length < 3) {
+    showFieldValidationError('evalNotesInput', 'evalNotesError', t('eval_notes_error') || 'Catatan evaluasi wajib diisi minimal 3 karakter.');
+    return;
+  }
+  clearFieldValidationError('evalNotesInput', 'evalNotesError');
+
+  if (activeEvaluationContext) {
+    const record = {
+      id: 'eval_' + Date.now(),
+      periodKey: `${activeEvaluationContext.year}-${String(activeEvaluationContext.month + 1).padStart(2, '0')}`,
+      cycleLabel: activeEvaluationContext.cycleLabel || `${activeEvaluationContext.year}-${String(activeEvaluationContext.month + 1).padStart(2, '0')}`,
+      totalIncome: activeEvaluationContext.income,
+      totalExpense: activeEvaluationContext.expense,
+      totalBudget: activeEvaluationContext.budget,
+      totalSavings: activeEvaluationContext.savings,
+      savingRatio: activeEvaluationContext.savingRatio,
+      status: activeEvaluationContext.isOverbudget ? 'over' : 'under',
+      diff: activeEvaluationContext.diff || 0,
+      notes,
+      createdAt: new Date().toISOString()
+    };
+    state.evaluations.unshift(record);
+    saveEvaluationsToStorage();
+    if (activeEvaluationContext.triggerKey) {
+      localStorage.setItem(activeEvaluationContext.triggerKey, 'true');
+    }
+  }
+
+  closeEvaluationModal();
+  renderDashboardNotesSection();
+  renderAllMonthlyNotesModal();
+  showToast((t('eval_save_btn') || 'Evaluasi') + ' berhasil disimpan!', 'success');
+}
+
+// ================= SECTION CATATAN BULANAN (MONTHLY NOTES) =================
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDateShort(isoStr) {
+  if (!isoStr) return '';
+  try {
+    const d = new Date(isoStr);
+    if (isNaN(d.getTime())) return isoStr;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}, ${hh}:${mm}`;
+  } catch (e) {
+    return isoStr;
+  }
+}
+
+function renderDashboardNotesSection() {
+  const container = document.getElementById('dashboardNotesPreviewContainer');
+  const countBadge = document.getElementById('dashboardNotesCountBadge');
+  if (!container) return;
+
+  const evals = Array.isArray(state.evaluations) ? state.evaluations : [];
+  if (countBadge) {
+    countBadge.textContent = `${evals.length} ${t('sec_monthly_notes') ? 'Catatan' : 'Notes'}`;
+  }
+
+  if (evals.length === 0) {
+    container.innerHTML = `
+      <div class="p-4 sm:p-5 rounded-xl bg-slate-950/40 border border-slate-800/80 text-center flex flex-col items-center justify-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-300">
+          <i data-lucide="calendar-check" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h4 class="text-xs sm:text-sm font-bold text-slate-200">${t('no_notes_yet') || 'Belum ada catatan evaluasi bulanan tersimpan.'}</h4>
+          <p class="text-[11px] text-slate-400 mt-1 max-w-md mx-auto leading-relaxed">
+            ${t('no_notes_yet_sub') || 'Catatan otomatis dibuat saat Anda mengisi evaluasi pada tanggal gajian atau tanggal 1 setiap bulan, atau Anda bisa menuliskannya secara manual kapan saja.'}
+          </p>
+        </div>
+
+      </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
+  // Ambil catatan evaluasi paling mutakhir untuk preview di dashboard
+  const latest = evals[0];
+  const isOver = latest.status === 'over';
+  const statusBadge = isOver
+    ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">🔴 Overbudget (${formatRp(latest.diff || 0)})</span>`
+    : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🟢 Underbudget (${formatRp(latest.diff || 0)})</span>`;
+
+  const dateStr = latest.createdAt ? formatDateShort(latest.createdAt) : '';
+
+  container.innerHTML = `
+    <div class="space-y-3">
+      <div class="p-3.5 sm:p-4 rounded-xl bg-slate-950/70 border border-slate-800/90 hover:border-indigo-500/40 transition-all">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-indigo-300 border border-indigo-500/30 font-mono-num">
+              🗓️ ${escapeHTML(latest.cycleLabel || latest.periodKey || 'Periode')}
+            </span>
+            ${statusBadge}
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono-num font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">
+              📈 Saving: ${latest.savingRatio || 0}%
+            </span>
+          </div>
+          ${dateStr ? `<span class="text-[10px] text-slate-500 font-mono-num">Dibuat: ${dateStr}</span>` : ''}
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 my-2.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800/60 text-[11px]">
+          <div>
+            <span class="text-slate-400 block text-[10px]">Pemasukan</span>
+            <span class="font-bold text-emerald-400 font-mono-num">${formatRp(latest.totalIncome || 0)}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">Pengeluaran</span>
+            <span class="font-bold text-rose-400 font-mono-num">${formatRp(latest.totalExpense || 0)}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">Budget</span>
+            <span class="font-bold text-slate-200 font-mono-num">${formatRp(latest.totalBudget || 0)}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">Ditabung</span>
+            <span class="font-bold text-blue-400 font-mono-num">${formatRp(latest.totalSavings || 0)}</span>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
+          <div class="flex items-center gap-1.5 text-indigo-400 text-[11px] font-bold mb-1">
+            <i data-lucide="message-square-text" class="w-3.5 h-3.5"></i>
+            <span>Catatan Refleksi:</span>
+          </div>
+          ${escapeHTML(latest.notes)}
+        </div>
+      </div>
+
+      ${evals.length > 1 ? `
+        <div class="flex items-center justify-between pt-1 text-xs text-slate-400">
+          <span>Menampilkan 1 dari ${evals.length} catatan bulanan tersimpan.</span>
+          <button
+            type="button"
+            onclick="openAllMonthlyNotesModal()"
+            class="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 focus:outline-none"
+          >
+            <span>Lihat Semua Catatan (${evals.length})</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      ` : ''}
+    </div>
+  `;
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function openAllMonthlyNotesModal() {
+  const modal = document.getElementById('modalAllMonthlyNotes');
+  if (!modal) return;
+  renderAllMonthlyNotesModal();
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => modal.classList.add('modal-open'));
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function closeAllMonthlyNotesModal() {
+  const modal = document.getElementById('modalAllMonthlyNotes');
+  if (modal) {
+    modal.classList.remove('modal-open');
+    setTimeout(() => modal.classList.add('hidden'), 200);
+  }
+}
+
+function renderAllMonthlyNotesModal() {
+  const container = document.getElementById('allNotesListContainer');
+  const badge = document.getElementById('allNotesModalBadge');
+  if (!container) return;
+
+  const evals = Array.isArray(state.evaluations) ? state.evaluations : [];
+  if (badge) badge.textContent = String(evals.length);
+
+  if (evals.length === 0) {
+    container.innerHTML = `
+      <div class="p-8 rounded-xl bg-slate-950/40 border border-slate-800/80 text-center flex flex-col items-center justify-center gap-3">
+        <div class="w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-300">
+          <i data-lucide="book-open" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-bold text-white">${t('no_notes_yet') || 'Belum ada catatan evaluasi bulanan tersimpan.'}</h4>
+          <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed">
+            ${t('no_notes_yet_sub') || 'Catatan akan tersimpan otomatis saat Anda mengisi evaluasi bulanan pada tanggal gajian atau tanggal 1.'}
+          </p>
+        </div>
+
+      </div>
+    `;
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+
+  let html = '';
+  evals.forEach((ev) => {
+    const isOver = ev.status === 'over';
+    const statusBadge = isOver
+      ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">🔴 Defisit ${formatRp(ev.diff || 0)}</span>`
+      : `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🟢 Hemat ${formatRp(ev.diff || 0)}</span>`;
+
+    const dateStr = ev.createdAt ? formatDateShort(ev.createdAt) : '';
+
+    html += `
+      <div class="p-4 rounded-xl bg-slate-950/70 border border-slate-800/90 hover:border-indigo-500/40 transition-all space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2.5 border-b border-slate-800/80">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-slate-800 text-indigo-300 border border-indigo-500/30 font-mono-num">
+              🗓️ ${escapeHTML(ev.cycleLabel || ev.periodKey || 'Periode')}
+            </span>
+            ${statusBadge}
+            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono-num font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30">
+              📈 Saving: ${ev.savingRatio || 0}%
+            </span>
+          </div>
+          ${dateStr ? `<span class="text-[10px] text-slate-500 font-mono-num">Dibuat: ${dateStr}</span>` : ''}
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/60 text-[11px]">
+          <div>
+            <span class="text-slate-400 block text-[10px]">Pemasukan</span>
+            <span class="font-bold text-emerald-400 font-mono-num">${formatRp(ev.totalIncome || 0)}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">Pengeluaran</span>
+            <span class="font-bold text-rose-400 font-mono-num">${formatRp(ev.totalExpense || 0)}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">Budget</span>
+            <span class="font-bold text-slate-200 font-mono-num">${formatRp(ev.totalBudget || 0)}</span>
+          </div>
+          <div>
+            <span class="text-slate-400 block text-[10px]">Ditabung</span>
+            <span class="font-bold text-blue-400 font-mono-num">${formatRp(ev.totalSavings || 0)}</span>
+          </div>
+        </div>
+
+        <div class="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-xs text-slate-200 leading-relaxed font-sans whitespace-pre-line">
+          <div class="flex items-center gap-1.5 text-indigo-400 text-[11px] font-bold mb-1">
+            <i data-lucide="message-square-text" class="w-3.5 h-3.5"></i>
+            <span>Catatan Refleksi:</span>
+          </div>
+          ${escapeHTML(ev.notes)}
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800/60">
+          <button
+            type="button"
+            onclick="editMonthlyEvaluationNote('${ev.id}')"
+            class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-indigo-300 hover:bg-slate-800 transition-colors flex items-center gap-1"
+            title="Edit Catatan"
+          >
+            <i data-lucide="edit-3" class="w-3 h-3"></i>
+            <span>Edit</span>
+          </button>
+          <button
+            type="button"
+            onclick="deleteMonthlyEvaluationNote('${ev.id}')"
+            class="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-1"
+            title="Hapus Catatan"
+          >
+            <i data-lucide="trash-2" class="w-3 h-3"></i>
+            <span>Hapus</span>
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function openManualEvaluationModal() {
+  const now = new Date();
+  const evalYear = state.selectedYear;
+  const evalMonth = state.selectedMonth === -1 ? now.getMonth() : state.selectedMonth;
+  const cycle = getCurrentCycleDateRange(evalYear, evalMonth);
+
+  const txInCycle = state.transactions.filter((tx) => {
+    if (!tx.date) return false;
+    const parts = tx.date.split('-');
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    const txObj = new Date(y, m - 1, d, 12, 0, 0, 0);
+    return txObj >= cycle.start && txObj <= cycle.end;
+  });
+
+  let inc = 0, exp = 0, sav = 0;
+  txInCycle.forEach((tx) => {
+    const amt = Number(tx.amount) || 0;
+    if (tx.type === 'Income') inc += amt;
+    else if (tx.type === 'Expense') exp += amt;
+    else if (tx.type === 'Savings') sav += amt;
+  });
+
+  let bud = 0;
+  const schema = getActiveSchema();
+  schema.Expense.groups.forEach((g) =>
+    g.items.forEach((i) => {
+      if (!i.noBudget) {
+        bud += Number(state.budgets[makeBudgetKey(i.name, evalYear, evalMonth)]) || 0;
+      }
+    })
+  );
+
+  const isOver = bud > 0 && exp > bud;
+  const diff = Math.abs(exp - bud);
+  const savingRatio = inc > 0
+    ? Math.round((sav / inc) * 100)
+    : (exp > 0 ? Math.round((sav / exp) * 100) : 0);
+
+  closeAllMonthlyNotesModal();
+
+  openEvaluationModal({
+    year: evalYear,
+    month: evalMonth,
+    cycleLabel: cycle.label,
+    income: inc,
+    expense: exp,
+    budget: bud,
+    savings: sav,
+    isOverbudget: isOver,
+    diff,
+    savingRatio,
+    triggerKey: null
+  });
+}
+
+function editMonthlyEvaluationNote(evalId) {
+  const note = state.evaluations.find((e) => e.id === evalId);
+  if (!note) return;
+  const newNotes = window.prompt('Ubah Catatan Evaluasi Bulanan:', note.notes);
+  if (newNotes === null) return;
+  const trimmed = newNotes.trim();
+  if (trimmed.length < 3) {
+    showToast('Catatan evaluasi minimal 3 karakter.', 'warning');
+    return;
+  }
+  note.notes = trimmed;
+  saveEvaluationsToStorage();
+  renderDashboardNotesSection();
+  renderAllMonthlyNotesModal();
+  showToast('Catatan evaluasi berhasil diperbarui!', 'success');
+}
+
+function deleteMonthlyEvaluationNote(evalId) {
+  if (!window.confirm('Apakah Anda yakin ingin menghapus catatan evaluasi ini?')) return;
+  state.evaluations = state.evaluations.filter((e) => e.id !== evalId);
+  saveEvaluationsToStorage();
+  renderDashboardNotesSection();
+  renderAllMonthlyNotesModal();
+  showToast('Catatan evaluasi telah dihapus.', 'info');
+}
+
+// ================= REMINDER TRANSAKSI HARIAN =================
+
+function checkDailyReminder() {
+  if (!state.settings || !state.settings.reminderEnabled) return;
+  const todayStr = getTodayLocalISO();
+  const reminderKey = `ft_reminder_shown_${todayStr}`;
+  if (localStorage.getItem(reminderKey)) return;
+
+  const todayHasTx = state.transactions.some((tx) => tx.date === todayStr);
+  if (!todayHasTx) {
+    setTimeout(() => {
+      showToast('🔔 Jangan lupa mencatat transaksi keuangan harianmu hari ini!', 'info');
+      localStorage.setItem(reminderKey, 'true');
+    }, 2500);
+  }
+}
+
 // ================= MASTER RENDER DASHBOARD =================
 
 function refreshDashboard() {
@@ -6144,9 +7225,13 @@ function refreshDashboard() {
 
   renderHeaderCards(metrics);
   renderWalletsSection();
+  renderSavingVsExpenseGauge(metrics);
+  renderPaydayConfigUI();
+  renderQuotesCard();
   renderBreakdownTables(metrics);
   renderAnalyticsCharts(metrics);
   renderTransactionHistory(filteredTx);
+  renderDashboardNotesSection();
   renderSettingsSection();
   syncAllCustomSelects();
 
@@ -6222,6 +7307,48 @@ function setModalTypeUI(type) {
         'tx-type-btn flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200 transition-all';
     }
   });
+
+  const expenseTypeWrap = document.getElementById('txExpenseTypeWrapper');
+  if (expenseTypeWrap) {
+    if (type === 'Expense') {
+      expenseTypeWrap.classList.remove('hidden');
+    } else {
+      expenseTypeWrap.classList.add('hidden');
+    }
+  }
+}
+
+function setModalTxQuadrant(q) {
+  const input = document.getElementById('txQuadrant');
+  if (input) input.value = q;
+  document.querySelectorAll('#txQuadrantContainer .tx-quadrant-btn').forEach((btn) => {
+    const bq = parseInt(btn.getAttribute('data-quadrant'), 10);
+    if (bq === q) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function setModalTxExpenseType(type) {
+  const input = document.getElementById('txExpenseType');
+  if (input) input.value = type;
+  const btnNeeds = document.getElementById('btnModalTxNeeds');
+  const btnWants = document.getElementById('btnModalTxWants');
+  if (btnNeeds && btnWants) {
+    if (type === 'needs') {
+      btnNeeds.className =
+        'py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 bg-emerald-500/20 border-emerald-500 text-emerald-300';
+      btnWants.className =
+        'py-2 px-3 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-1.5';
+    } else {
+      btnWants.className =
+        'py-2 px-3 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 bg-purple-500/20 border-purple-500 text-purple-300';
+      btnNeeds.className =
+        'py-2 px-3 rounded-xl text-xs font-semibold border border-slate-700 bg-slate-800/60 text-slate-400 hover:text-slate-200 transition-all flex items-center justify-center gap-1.5';
+    }
+  }
 }
 
 function setLockedTransactionDate(isoDateString) {
@@ -6257,6 +7384,9 @@ function openTransactionModal(defaultTypeOverride = null) {
 
   setLockedTransactionDate(getTodayLocalISO());
 
+  setModalTxQuadrant(2);
+  setModalTxExpenseType('needs');
+
   document.getElementById('txAmount').value = '';
   document.getElementById('txAmountPreview').textContent = formatRp(0);
   document.getElementById('txNote').value = '';
@@ -6288,6 +7418,9 @@ function openEditTransactionModal(txId) {
   populateCategorySelect(tx.type, tx.category);
   populatePaymentMethodsSelect(tx.account);
   setLockedTransactionDate(tx.date);
+
+  setModalTxQuadrant(Number(tx.quadrant) || 2);
+  setModalTxExpenseType(tx.expenseType || 'needs');
 
   document.getElementById('txAmount').value = formatNumberWithDots(tx.amount);
   document.getElementById('txAmountPreview').textContent = formatRp(tx.amount);
@@ -6332,6 +7465,8 @@ function handleTransactionFormSubmit(e) {
   const amount = parseFormattedNumber(document.getElementById('txAmount').value);
   const account = document.getElementById('txAccount').value;
   const note = document.getElementById('txNote').value.trim();
+  const quadrant = parseInt(document.getElementById('txQuadrant').value, 10) || 2;
+  const expenseType = document.getElementById('txExpenseType').value || 'needs';
 
   if (!amount || amount <= 0) {
     showFieldValidationError('txAmount', 'txAmountError', `> ${formatRp(0)}`);
@@ -6350,7 +7485,9 @@ function handleTransactionFormSubmit(e) {
         category,
         amount,
         account,
-        note
+        note,
+        quadrant,
+        expenseType: type === 'Expense' ? expenseType : undefined
       };
       showToast(`${translateCategoryName(category)} — ${t('modal_tx_update')}!`);
     }
@@ -6362,7 +7499,9 @@ function handleTransactionFormSubmit(e) {
       category,
       amount,
       account,
-      note
+      note,
+      quadrant,
+      expenseType: type === 'Expense' ? expenseType : undefined
     };
     state.transactions.push(newTx);
     showToast(`${formatRp(amount)} • ${translateCategoryName(category)} (${account})!`);
@@ -7209,6 +8348,10 @@ function initApp() {
     document.getElementById('newWalletInitial'),
     document.getElementById('newWalletPreview')
   );
+  attachThousandSeparatorInput(
+    document.getElementById('paydayAmountInput'),
+    document.getElementById('paydayAmountPreview')
+  );
 
   document.getElementById('txAmount').addEventListener('input', () => {
     clearFieldValidationError('txAmount', 'txAmountError');
@@ -7309,6 +8452,8 @@ function initApp() {
       closeAddWalletModal();
       closeGoogleAuthModal();
       closeSecuritySetupModal();
+      closeEvaluationModal();
+      closeAllMonthlyNotesModal();
     }
   });
 
@@ -7324,6 +8469,10 @@ function initApp() {
   if (state.isAppLocked && state.security && state.security.enabled) {
     renderAppLockOverlay();
   }
+
+  initQuotesRotation();
+  checkAutoEvaluationTrigger();
+  checkDailyReminder();
 
   initPwaInstallButton();
   initNetworkAutoSyncListener();

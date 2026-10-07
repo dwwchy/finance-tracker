@@ -1,7 +1,1072 @@
 /**
  * Data Model, Struktur Kategori Pos Keuangan (FINANCE_SCHEMA),
+ * Struktur Data Reaktif Default (defaultFinancialData), Kuadran Eisenhower,
  * Daftar Dompet/Penyimpanan Dana Default, Mata Uang, Kamus Multi-Bahasa Lengkap, dan Utilitas Tanggal Real-Time.
  */
+
+const billionaireQuotes = [
+  {
+    "text": "Jangan menabung apa yang tersisa setelah dibelanjakan; habiskan apa yang tersisa setelah menabung.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Bukan berapa banyak uang yang kamu hasilkan, tapi berapa banyak uang yang kamu pertahankan.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Waspadalah terhadap pengeluaran kecil; kebocoran kecil bisa menenggelamkan kapal besar.",
+    "author": "Benjamin Franklin"
+  },
+  {
+    "text": "Membeli barang yang tidak kamu butuhkan dengan uang yang tidak kamu miliki untuk membuat orang yang tidak kamu sukai terkesan adalah resep kemiskinan.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Jika kamu membeli barang yang tidak kamu butuhkan, segera kamu harus menjual barang yang kamu butuhkan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kekayaan sejati adalah apa yang tidak kamu lihat: mobil yang tidak dibeli, jam tangan yang tidak dipakai, dan pakaian bermerek yang dilewati.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Banyak orang menghabiskan uang yang belum mereka hasilkan untuk membeli barang yang tidak mereka inginkan demi memukau orang yang tidak mereka pedulikan.",
+    "author": "Will Rogers"
+  },
+  {
+    "text": "Frugalitas bukanlah tentang menjadi pelit, melainkan tentang menetapkan prioritas finansial secara cerdas.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Kemewahan terbesar bukanlah barang mahal, melainkan kebebasan untuk tidak mengkhawatirkan uang besok pagi.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Aturan No. 1: Jangan pernah kehilangan uang. Aturan No. 2: Jangan pernah lupa aturan nomor satu.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Setiap rupiah yang kamu hemat adalah satu prajurit tambahan yang bekerja untuk kebebasan finansialmu.",
+    "author": "Kevin O'Leary"
+  },
+  {
+    "text": "Orang kaya tetap kaya karena mereka hidup seperti orang miskin, sementara orang miskin tetap miskin karena hidup seperti orang kaya.",
+    "author": "Mark Cuban"
+  },
+  {
+    "text": "Harga adalah apa yang kamu bayar. Nilai adalah apa yang kamu dapatkan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Mengendalikan nafsu belanja hari ini adalah tiket menuju ketenangan hidup sepuluh tahun ke depan.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Disiplin finansial dimulai dari kemampuan mengatakan 'tidak' pada godaan sesaat.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Jangan biarkan gaya hidupmu naik lebih cepat daripada kenaikan tabunganmu.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Menabung secara teratur menghasilkan keajaiban bukan hanya pada saldo rekening, tapi juga pada ketenangan jiwa.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Jika kamu tidak bisa mengendalikan emosimu, kamu tidak akan bisa mengendalikan uangmu.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kaya adalah memiliki uang; bebas secara finansial adalah memiliki kendali penuh atas waktumu.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Kemampuan menunda kepuasan instan adalah fondasi utama dari akumulasi kekayaan jangka panjang.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Menjadi hemat memaksamu untuk menjadi kreatif dalam mencari solusi bernilai tinggi.",
+    "author": "Jeff Bezos"
+  },
+  {
+    "text": "Uang yang disimpan di dompet hari ini adalah rasa aman yang kamu nikmati di masa krisis esok hari.",
+    "author": "Li Ka-shing"
+  },
+  {
+    "text": "Jangan meminjam uang untuk mendanai gaya hidup konsumtif. Itu adalah bentuk perbudakan modern.",
+    "author": "Mark Cuban"
+  },
+  {
+    "text": "Anggaran bukanlah kurungan bagi uangmu, melainkan peta jalan yang memberi izin ke mana uangmu harus pergi.",
+    "author": "John C. Bogle"
+  },
+  {
+    "text": "Orang cerdas memotong biaya sebelum biaya tersebut memotong masa depan mereka.",
+    "author": "Andrew Carnegie"
+  },
+  {
+    "text": "Koleksi aset, bukan koleksi barang pamer.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Satu-satunya cara pasti untuk menumbuhkan kekayaan adalah mempertahankan selisih lebar antara penghasilan dan pengeluaran.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Menabung tanpa tujuan investasi masih jauh lebih baik daripada belanja tanpa perhitungan.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Kekayaan dibangun dari surplus bulanan yang dijaga dengan disiplin besi.",
+    "author": "Thomas J. Stanley"
+  },
+  {
+    "text": "Jangan mengukur kesuksesan dari saldo yang keluar untuk barang mewah, ukurlah dari saldo yang bertahan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kemandirian finansial dimulai saat kamu berhenti peduli pada validasi sosial dari barang-barangmu.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Hidup di bawah kemampuan finansialmu adalah satu-satunya strategi yang tidak pernah gagal.",
+    "author": "J. Paul Getty"
+  },
+  {
+    "text": "Ketika kamu menghormati uang receh, uang besar akan menemukan jalan ke dalam hidupmu.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Tabungan adalah margin keamananmu dalam menghadapi ketidakpastian dunia.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Orang yang tidak bisa mengelola sepuluh juta tidak akan pernah siap mengelola sepuluh miliar.",
+    "author": "Dave Ramsey"
+  },
+  {
+    "text": "Kunci akumulasi kekayaan bukanlah penghasilan tinggi, melainkan pengeluaran yang terukur secara sadar.",
+    "author": "Thomas J. Stanley"
+  },
+  {
+    "text": "Sederhana dalam penampilan, raksasa dalam aset finansial.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Setiap pengeluaran impulsif mencuri waktu berharga dari masa pensiunmu.",
+    "author": "Jack Bogle"
+  },
+  {
+    "text": "Jangan korbankan kebebasan masa depan demi kesenangan semu 15 menit.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Orang boros membeli barang untuk status; orang bijak membeli waktu dan kebebasan.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Menabung adalah tindakan mencintai dirimu sendiri di masa tua.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Catat setiap pengeluaran, karena apa yang diukur adalah apa yang bisa dikendalikan.",
+    "author": "Peter Drucker"
+  },
+  {
+    "text": "Gaya hidup mewah yang dipaksakan hanya menciptakan ilusi sukses di atas fondasi kerapuhan.",
+    "author": "Kevin O'Leary"
+  },
+  {
+    "text": "Uang adalah pelayan yang luar biasa, tetapi tuan yang sangat kejam jika kamu tidak mendisiplinkannya.",
+    "author": "P.T. Barnum"
+  },
+  {
+    "text": "Jika kamu ingin kaya, pikirkan tentang menabung sama gigihnya dengan memikirkan menghasilkan uang.",
+    "author": "Benjamin Franklin"
+  },
+  {
+    "text": "Pemisahan antara kebutuhan dan keinginan adalah ujian kecerdasan finansial yang paling mendasar.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Menabung memberi fleksibilitas; dan fleksibilitas memberi peluang untuk menangkap kesempatan emas.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Bukan berapa banyak yang kamu belanjakan yang membuatmu bahagia, melainkan seberapa sedikit kamu merasa cemas.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Ketika kamu menolak hidup berlebihan, kamu membebaskan dirimu dari rasa takut kehilangan segalanya.",
+    "author": "Seneca"
+  },
+  {
+    "text": "Kekayaan tidak tercipta dari keberuntungan sesaat, tapi dari kebiasaan mencatat dan menabung setiap bulan.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Bunga berbunga (Compound Interest) adalah keajaiban dunia kedelapan. Siapa yang memahaminya, menghasilkannya; siapa yang tidak, membayarnya.",
+    "author": "Albert Einstein"
+  },
+  {
+    "text": "Waktu adalah sahabat bagi bisnis yang hebat, dan musuh bagi yang biasa-biasa saja.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Investasi terbaik yang bisa kamu lakukan adalah investasi pada dirimu sendiri dan pengetahuanmu.",
+    "author": "Benjamin Graham"
+  },
+  {
+    "text": "Pasar saham adalah alat untuk mentransfer uang dari orang yang tidak sabar kepada orang yang sabar.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Jangan menaruh semua telurmu di dalam satu keranjang tanpa memahami risikonya.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Diversifikasi adalah perlindungan terhadap ketidaktahuan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Jangan mencari jarum di tumpukan jerami. Beli saja seluruh tumpukan jeraminya.",
+    "author": "John C. Bogle"
+  },
+  {
+    "text": "Jika kamu tidak bersedia memegang saham selama sepuluh tahun, jangan pernah berpikir memegangnya selama sepuluh menit.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kunci menghasilkan uang dalam investasi adalah tidak takut rugi saat pasar sedang bergejolak.",
+    "author": "Peter Lynch"
+  },
+  {
+    "text": "Investasikan uangmu untuk aset yang menghasilkan arus kas saat kamu tertidur.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Orang yang paling sukses dalam investasi adalah mereka yang memiliki temperamen tenang, bukan IQ tertinggi.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Risiko datang dari ketidaktahuan akan apa yang sedang kamu lakukan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Waktu di pasar jauh lebih penting daripada mencoba menebak waktu terbaik di pasar.",
+    "author": "Ken Fisher"
+  },
+  {
+    "text": "Uang tumbuh di tempat di mana ia diperlakukan dengan sabar dan dihormati prosesnya.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Ketakutan dan keserakahan adalah dua musuh terbesar seorang investor.",
+    "author": "Benjamin Graham"
+  },
+  {
+    "text": "Jadilah takut saat orang lain serakah, dan jadilah serakah saat orang lain ketakutan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Investasi bukanlah perjudian; ini adalah alokasi modal berbasis perhitungan matematis dan kesabaran.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Bukan penurunan pasar yang menghancurkan investor, melainkan reaksi panik mereka sendiri.",
+    "author": "Peter Lynch"
+  },
+  {
+    "text": "Tujuan investasi bukan untuk mengalahkan orang lain, melainkan untuk memenuhi rencana finansial pribadimu.",
+    "author": "Benjamin Graham"
+  },
+  {
+    "text": "Kekayaan besar dibangun dari keuntungan kecil yang terakumulasi terus menerus tanpa gangguan.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Modal pertama yang harus kamu kumpulkan adalah modal pengetahuan sebelum menyuntikkan uangmu.",
+    "author": "Li Ka-shing"
+  },
+  {
+    "text": "Pasar adalah mesin penimbang dalam jangka panjang, meskipun dalam jangka pendek ia hanyalah mesin pemungut suara.",
+    "author": "Benjamin Graham"
+  },
+  {
+    "text": "Jangan pernah berinvestasi pada bisnis yang tidak kamu pahami model kerjanya.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Investasi pada literasi finansial memberikan dividen tertinggi seumur hidup.",
+    "author": "Benjamin Franklin"
+  },
+  {
+    "text": "Compound interest membutuhkan dua bahan bakar utama: modal awal dan kesabaran tanpa henti.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Aset sejati memasukkan uang ke kantongmu; liabilitas mengeluarkan uang dari kantongmu.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Semakin tenang kepribadianmu saat pasar turun, semakin besar peluangmu menjadi kaya.",
+    "author": "Peter Lynch"
+  },
+  {
+    "text": "Rencana investasi yang sederhana namun dieksekusi dengan konsisten selalu mengalahkan rencana rumit yang ditinggalkan di tengah jalan.",
+    "author": "John C. Bogle"
+  },
+  {
+    "text": "Keberhasilan investasi jangka panjang diukur dari seberapa sedikit kesalahan fatal yang kamu buat.",
+    "author": "Howard Marks"
+  },
+  {
+    "text": "Tahu apa yang tidak kamu ketahui adalah keunggulan terbesar seorang investor cerdas.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Uang tidak menyukai keraguan. Pelajari, rencanakan, investasikan, lalu biarkan waktu bekerja.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Investasi yang membosankan sering kali menghasilkan imbal hasil yang paling memuaskan.",
+    "author": "George Soros"
+  },
+  {
+    "text": "Jangan biarkan volatilitas harian mengaburkan gambaran pertumbuhan 10 tahun ke depan.",
+    "author": "Jack Bogle"
+  },
+  {
+    "text": "Pertumbuhan eksponensial selalu terlihat lambat di awal sebelum tiba-tiba mengejutkan dunia.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Investor sejati menyukai koreksi harga karena itu memberi mereka kesempatan membeli aset berkualitas dengan diskon.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Biaya tertinggi dalam investasi adalah biaya penundaan untuk memulai.",
+    "author": "Charles Schwab"
+  },
+  {
+    "text": "Pertahankan investasi dasarmu sesederhana mungkin agar kamu tidak stres menjalaninya.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Kekayaan tidak datang dari berspekulasi, tetapi dari memiliki bagian dari bisnis riil yang terus bertumbuh.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Investasi adalah maraton mental, bukan sprint emosional.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Keajaiban compounding hanya bekerja jika kamu tidak menyela prosesnya di tengah jalan.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Ketika kamu berinvestasi pada masa depan, masa depan akan membayar kembali dengan kebebasan.",
+    "author": "Mark Cuban"
+  },
+  {
+    "text": "Tidak ada pengembalian tinggi tanpa risiko; pahami risikonya sebelum mengejar hasilnya.",
+    "author": "Howard Marks"
+  },
+  {
+    "text": "Investasi paling menguntungkan adalah alokasi modal ke dalam hal-hal yang meningkatkan produktivitas pribadimu.",
+    "author": "Bill Gates"
+  },
+  {
+    "text": "Menghindari kehancuran finansial adalah syarat mutlak untuk menikmati buah dari compounding.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Fokuslah pada tren besar jangka panjang daripada riak-riak kecil berita harian.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Pasar saham menghukum mereka yang serakah dan memberi hadiah bagi mereka yang sabar.",
+    "author": "Philip Fisher"
+  },
+  {
+    "text": "Jika kamu mengerti arus kas, kamu mengerti jantung dari seluruh dunia investasi.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Satu-satunya metrik yang penting adalah pertumbuhan nilai bersih (net worth) riil dari tahun ke tahun.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Investasikan waktu untuk memahami fundamental sebelum menginvestasikan rupiah hasil keringatmu.",
+    "author": "Peter Lynch"
+  },
+  {
+    "text": "Kesabaran adalah keunggulan kompetitif terbesar di abad yang serba terburu-buru ini.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Uang hanyalah alat pengungkit; ia memperbesar karakter aslimu, bukan mengubahnya.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Kaya adalah kemampuan untuk bangun setiap pagi dan berkata: 'Hari ini aku bisa melakukan apa pun yang aku inginkan.'",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Jika kamu lahir miskin itu bukan salahmu, tetapi jika kamu mati miskin itu adalah tanggung jawabmu.",
+    "author": "Bill Gates"
+  },
+  {
+    "text": "Orang yang mengejar uang demi gengsi tidak akan pernah merasa cukup, karena gengsi tidak punya batas akhir.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Uang tidak membeli kebahagiaan, tetapi uang membeli pilihan dan kebebasan dari stres finansial.",
+    "author": "Mark Cuban"
+  },
+  {
+    "text": "Pikiran miskin fokus pada kelangkaan; pikiran makmur fokus pada penciptaan nilai.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Bukan apa yang kamu miliki yang mendefinisikanmu, melainkan apa yang mampu kamu bangun dan bagikan.",
+    "author": "Andrew Carnegie"
+  },
+  {
+    "text": "Kekayaan sejati dibangun dalam keheningan tanpa perlu pengakuan dari orang luar.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Ubah fokusmu dari 'menghabiskan' menjadi 'mengalokasikan' sumber daya.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Rasa cukup adalah kekayaan tertinggi yang tidak bisa dirampas oleh siapa pun.",
+    "author": "Kurt Vonnegut"
+  },
+  {
+    "text": "Orang pesimis terdengar pintar, tetapi orang optimis yang menghasilkan kekayaan.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Keberuntungan finansial berpihak pada mereka yang siap secara strategi dan disiplin secara mental.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Jangan biarkan uang mengontrol keputusan hidupmu; kendalikan uang agar ia melayani tujuan hidupmu.",
+    "author": "Li Ka-shing"
+  },
+  {
+    "text": "Rasa iri terhadap pengeluaran orang lain adalah racun paling cepat merusak keuangan pribadimu.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Tujuan akhir dari kebebasan finansial adalah berhenti memikirkan uang selamanya.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Jika kamu ingin hasil yang berbeda, kamu harus memiliki hubungan emosional yang berbeda dengan uangmu.",
+    "author": "Dave Ramsey"
+  },
+  {
+    "text": "Orang kaya fokus pada peluang, sementara orang biasa fokus pada rintangan dan alasan.",
+    "author": "T. Harv Eker"
+  },
+  {
+    "text": "Integritas moral dan disiplin anggaran adalah dua pilar terkuat dari kesuksesan jangka panjang.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kekayaan bukanlah tentang memiliki banyak hal, melainkan tentang memiliki sedikit kebutuhan yang mengikat.",
+    "author": "Epictetus"
+  },
+  {
+    "text": "Jangan pernah iri pada kekayaan seseorang sebelum kamu melihat bagaimana ia mengelola utangnya.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Pendidikan finansial adalah jembatan antara kerja keras dan kemakmuran sejati.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Belajarlah untuk merasa nyaman hidup sederhana bahkan ketika saldo rekeningmu terus bertambah.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Uang adalah perpanjangan dari energimu; gunakan untuk hal-hal yang memberi dampak abadi.",
+    "author": "Oprah Winfrey"
+  },
+  {
+    "text": "Tidak ada jumlah uang yang cukup bagi orang yang selalu membandingkan hidupnya dengan tetangga.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Mindset kaya melihat kegagalan finansial sebagai biaya kursus untuk kemenangan berikutnya.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Ketenangan finansial tercapai saat gaya hidupmu stabil terlepas dari naik-turunnya gengsi pergaulan.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Uang yang datang dengan mudah biasanya pergi dengan cara yang memalukan; hargai proses lambatnya.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Bebas dari utang konsumtif memberi kekuatan tidur nyenyak yang tidak bisa dibeli dengan mobil mewah.",
+    "author": "Mark Cuban"
+  },
+  {
+    "text": "Jika kamu menguasai pikiranmu tentang uang, kamu menguasai sebagian besar rasa cemas dalam hidup modern.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Kekayaan tanpa tujuan mulia hanyalah tumpukan angka tanpa jiwa.",
+    "author": "Andrew Carnegie"
+  },
+  {
+    "text": "Perlakukan setiap rupiah sebagai karyawan kecil yang harus bekerja keras untuk mendatangkan teman-temannya.",
+    "author": "Kevin O'Leary"
+  },
+  {
+    "text": "Orang yang mengejar kepuasan instan akan selalu menjadi budak dari orang yang sabar menanti.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Jangan biarkan rasa takut membuatmu pasif, dan jangan biarkan keserakahan membuatmu ceroboh.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Rasa percaya diri sejati tidak berasal dari merek pakaianmu, melainkan dari cadangan likuiditas di belakangmu.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Kekayaan sejati memberi kamu otonomi penuh atas jadwal harianmu.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Ketika kamu berhenti memikirkan apa kata orang, kamu baru saja menghemat 50% dari pengeluaran tidak pentingmu.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Uang adalah katalis: ia membuat orang baik semakin dermawan dan orang buruk semakin serakah.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Fokus pada proses menabung setiap minggu, dan biarkan hasil tahunan mengejutkan dirimu.",
+    "author": "James Clear"
+  },
+  {
+    "text": "Kaya adalah sebuah pilihan mental sebelum ia menjelma menjadi angka di buku tabungan.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Menghargai waktu adalah awal dari menghargai uang; keduanya tidak bisa dipisahkan.",
+    "author": "Steve Jobs"
+  },
+  {
+    "text": "Kunci kedamaian finansial adalah menjaga ekspektasi tetap rendah saat pendapatan terus naik.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Hiduplah sedemikian rupa sehingga kamu tidak perlu menyembunyikan laporan keuanganmu dari siapa pun.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Jangan biarkan dompetmu tebal tapi tabungan masa depanmu kurus kering.",
+    "author": "Jack Ma"
+  },
+  {
+    "text": "Kecerdasan emosional jauh lebih berharga daripada rumus finansial rumit dalam menjaga kekayaan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kekayaan adalah kemampuan untuk menahan diri saat semua orang di sekitarmu sedang berlomba pamer.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Jika kamu tahu nilai dari kemerdekaan, kamu tidak akan pernah menukarnya dengan utang konsumtif.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Orang bijak menganggap uang sebagai sarana untuk mencapai tujuan hidup, bukan tujuan itu sendiri.",
+    "author": "Aristoteles Onassis"
+  },
+  {
+    "text": "Ketenangan hati di akhir bulan adalah bukti nyata bahwa kamu telah menang atas egomu.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Keberanian untuk menolak gaya hidup konsumtif adalah tanda kedewasaan finansial tingkat tinggi.",
+    "author": "Thomas J. Stanley"
+  },
+  {
+    "text": "Uang terbaik adalah uang yang memberi kamu kebebasan untuk berkata: 'Tidak, aku tidak tertarik.'",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Rencana finansial tanpa disiplin eksekusi hanyalah angan-angan di atas kertas.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Mempersiapkan diri untuk hari hujan adalah satu-satunya jaminan agar kamu tidak basah kuyup saat badai datang.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Dana darurat bukanlah pilihan; itu adalah fondasi utama sebelum kamu berani melangkah lebih jauh.",
+    "author": "Dave Ramsey"
+  },
+  {
+    "text": "Kegagalan merencanakan keuangan adalah perencanaan aktif menuju kebangkrutan.",
+    "author": "Benjamin Franklin"
+  },
+  {
+    "text": "Risiko terbesar dalam hidup adalah tidak mengambil risiko yang terukur sama sekali.",
+    "author": "Mark Zuckerberg"
+  },
+  {
+    "text": "Selalu sediakan margin keamanan dalam setiap kalkulasi anggaramu.",
+    "author": "Benjamin Graham"
+  },
+  {
+    "text": "Jangan pernah menguji kedalaman sungai dengan kedua kakimu sekaligus.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Disiplin adalah jembatan antara tujuan finansial dan pencapaian finansial yang nyata.",
+    "author": "Jim Rohn"
+  },
+  {
+    "text": "Mengetahui titik lemah keuanganmu sendiri adalah pertahanan terbaik melawan krisis ekonomi.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Ukur pengeluaranmu setiap minggu agar kamu tidak terkejut di akhir bulan.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Kestabilan finansial tidak tercipta secara kebetulan; ia dirancang dengan aturan yang ketat.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Hindari utang kartu kredit seperti kamu menghindari wabah penyakit.",
+    "author": "Mark Cuban"
+  },
+  {
+    "text": "Perencanaan jangka panjang menyelamatkanmu dari keputusan impulsif jangka pendek.",
+    "author": "Jeff Bezos"
+  },
+  {
+    "text": "Jika kamu ingin membangun gedung tinggi kekayaan, kamu harus menggali fondasi anggaran yang dalam terlebih dahulu.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Kendalikan pengeluaran tetapmu; pengeluaran tetap yang tinggi adalah jebakan paling berbahaya.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Evaluasi keuangan berkala adalah kompas yang memastikan kapal finansialmu tidak melenceng dari arah.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Kekuatan terbesar sebuah sistem anggaran adalah kesederhanaan dan kepatuhan penuh dalam menjalankannya.",
+    "author": "Jack Bogle"
+  },
+  {
+    "text": "Jangan menunggu datangnya krisis untuk menyadari pentingnya memiliki tabungan likuid.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Manajemen risiko yang baik membuatmu bisa bertahan cukup lama untuk menikmati keuntungan besar.",
+    "author": "Paul Tudor Jones"
+  },
+  {
+    "text": "Kunci bertahan hidup di dunia finansial adalah tidak pernah membiarkan dirimu tersingkir dari permainan.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Buat aturan untuk uangmu, atau ketiadaan aturan akan menghabiskan uangmu.",
+    "author": "Peter Lynch"
+  },
+  {
+    "text": "Satu keputusan ceroboh bisa menghapus disiplin menabung selama bertahun-tahun; waspadalah selalu.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Mengetahui kapan harus berhenti belanja adalah bentuk perlindungan aset paling efektif.",
+    "author": "Howard Marks"
+  },
+  {
+    "text": "Jangan pertaruhkan apa yang penting bagimu demi mengejar apa yang sebenarnya tidak kamu butuhkan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Keteraturan mencatat transaksi melatih kesadaran finansial yang tajam.",
+    "author": "Thomas J. Stanley"
+  },
+  {
+    "text": "Sistem keuangan yang tangguh dibangun di atas asumsi bahwa hal buruk bisa terjadi sewaktu-waktu.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Sediakan selalu bantalan kas agar kamu tidak terpaksa menjual aset di saat pasar sedang hancur.",
+    "author": "Seth Klarman"
+  },
+  {
+    "text": "Disiplin menabung 20% dari setiap pemasukan akan mengubah jalan hidupmu dalam 5 tahun.",
+    "author": "David Bach"
+  },
+  {
+    "text": "Jangan pernah mengandalkan satu sumber pendapatan saja; bangun proteksi cadangan.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kerapian dalam mengelola dompet kecil mencerminkan kesiapan dalam mengelola portofolio raksasa.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Pemisahan kantong dompet mencegah kebocoran alokasi yang tidak disadari.",
+    "author": "Li Ka-shing"
+  },
+  {
+    "text": "Konsistensi kecil yang dilakukan setiap hari menghasilkan lonjakan besar yang tak terbayangkan dalam jangka panjang.",
+    "author": "James Clear"
+  },
+  {
+    "text": "Ketika kamu memperlakukan anggaranmu dengan rasa hormat, uangmu akan memperlakukanmu dengan rasa aman.",
+    "author": "Dave Ramsey"
+  },
+  {
+    "text": "Jauhkan emosi saat menyusun rencana pengeluaran bulanan.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Biaya yang tidak terlihat sering kali menjadi pembunuh paling kejam bagi kesehatan finansial keluarga.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Miliki strategi bertahan sebelum kamu memikirkan strategi menyerang dan berekspansi.",
+    "author": "Paul Tudor Jones"
+  },
+  {
+    "text": "Perencanaan keuangan yang baik tidak bergantung pada keberuntungan pasar saham.",
+    "author": "Benjamin Graham"
+  },
+  {
+    "text": "Kekayaan yang tahan banting membutuhkan pertahanan yang sama kuatnya dengan penyerangan.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Lakukan audit pengeluaranmu seperti seorang auditor profesional memeriksa perusahaan.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Jika kamu tidak bisa mengukur ke mana uangmu mengalir, kamu tidak akan pernah bisa mengarahkannya.",
+    "author": "Peter Drucker"
+  },
+  {
+    "text": "Kunci kebebasan adalah memastikan kewajiban bulananmu jauh lebih kecil dari kemampuan riilmu.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Selalu sisihkan porsi tabungan di awal sebelum kamu mulai membagi uang untuk hal lain.",
+    "author": "George S. Clason"
+  },
+  {
+    "text": "Risiko terbesar dalam anggaran adalah ilusi bahwa tidak akan ada pengeluaran tak terduga bulan ini.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Jadilah arsitek yang teliti bagi masa depan keuanganmu sendiri.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Satu jam yang dihabiskan untuk merencanakan anggaran bernilai puluhan jam kerja keras tanpa arah.",
+    "author": "Jim Rohn"
+  },
+  {
+    "text": "Ketidaktahuan akan arus kas sendiri adalah dosa finansial yang paling fatal.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Kendalikan keinginan sebelum keinginan itu mengendalikan seluruh sisa saldo rekeningmu.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Pertahankan rasio tabungan yang sehat di setiap kondisi ekonomi.",
+    "author": "Thomas J. Stanley"
+  },
+  {
+    "text": "Keamanan finansial bukanlah angka statis, melainkan kebiasaan dinamis yang dijaga setiap hari.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Ketika rencanamu jelas, pengorbanan kecil hari ini terasa sangat berharga.",
+    "author": "John C. Bogle"
+  },
+  {
+    "text": "Fokuslah pada menciptakan nilai nyata untuk orang lain; uang akan mengalir sebagai dampak sampingannya.",
+    "author": "Elon Musk"
+  },
+  {
+    "text": "Peluang besar datang kepada mereka yang memiliki cadangan kas siap pakai saat krisis melanda.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Jangan bekerja keras hanya untuk uang; buatlah uang bekerja keras tanpa kenal lelah untukmu.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Kekayaan sejati tercipta dari kepemilikan atas bisnis, ekuitas, dan kekayaan intelektual.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Jika kamu satu-satunya mesin penghasil uang di rumahmu, kamu belum bebas secara finansial.",
+    "author": "Kevin O'Leary"
+  },
+  {
+    "text": "Bangun reputasi dan integritas; keduanya adalah mata uang paling mahal dalam dunia bisnis.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Kunci keberhasilan bisnis adalah obsesi melayani pelanggan, bukan obsesi mengalahkan pesaing.",
+    "author": "Jeff Bezos"
+  },
+  {
+    "text": "Arus kas adalah oksigen bagi bisnis dan keuangan pribadi; jika habis, semuanya mati.",
+    "author": "Michael Dell"
+  },
+  {
+    "text": "Jangan pernah berhenti berinovasi pada caramu menghasilkan dan melipatgandakan penghasilan.",
+    "author": "Steve Jobs"
+  },
+  {
+    "text": "Uang mengalir ke arah ide-ide brilian yang dieksekusi dengan kecepatan dan keberanian luar biasa.",
+    "author": "Richard Branson"
+  },
+  {
+    "text": "Kemandirian sejati tercapai saat pendapatan pasifmu telah melampaui seluruh biaya hidup standarmu.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Bukan modal uang yang pertama kali kamu butuhkan untuk memulai, melainkan keberanian dan ketekunan.",
+    "author": "Jack Ma"
+  },
+  {
+    "text": "Kemampuan memecahkan masalah rumit adalah magnet paling kuat untuk menarik kekayaan.",
+    "author": "Elon Musk"
+  },
+  {
+    "text": "Kekayaan tidak dibangun dalam semalam; itu adalah hasil dari ratusan keputusan kecil yang benar setiap hari.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Jangan menukar seluruh waktumu dengan uang seumur hidup; belajarlah melipatgandakan dampakmu.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Bisnis yang hebat dimulai dari pemahaman mendalam tentang apa yang paling dibutuhkan masyarakat.",
+    "author": "Henry Ford"
+  },
+  {
+    "text": "Ketika arus kas positif menjadi kebiasaan, pertumbuhan kekayaan hanya masalah waktu.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Jadilah pemilik aset, bukan sekadar penonton di pinggir lapangan ekonomi.",
+    "author": "Mark Cuban"
+  },
+  {
+    "text": "Keunggulan kompetitif terbesar adalah kemampuan untuk terus belajar lebih cepat daripada orang lain.",
+    "author": "Bill Gates"
+  },
+  {
+    "text": "Uang tidak pernah tidur; pastikan kamu memiliki sistem yang menghasilkan nilai saat kamu terlelap.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Tingkatkan keterampilanmu setiap tahun; kemampuan menghasilkan uang adalah aset terbesarmu.",
+    "author": "Brian Tracy"
+  },
+  {
+    "text": "Jangan biarkan kegagalan awal menghentikan langkahmu membangun portofolio masa depan.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Kekayaan yang kokoh dibangun di atas fondasi integritas, etika kerja tinggi, dan kesederhanaan.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Pelajari aturan main finansial, lalu mainkan dengan lebih disiplin daripada siapa pun.",
+    "author": "Robert Kiyosaki"
+  },
+  {
+    "text": "Ketika kamu mencintai apa yang kamu bangun, dedikasi akan melahirkan hasil finansial yang luar biasa.",
+    "author": "Steve Jobs"
+  },
+  {
+    "text": "Jangan membatasi impian finansialmu hanya karena kondisi awalmu saat ini terasa berat.",
+    "author": "Howard Schultz"
+  },
+  {
+    "text": "Investasi waktu pada keahlian langka dan berharga tinggi adalah jalan tercepat mendongkrak pemasukan.",
+    "author": "Cal Newport"
+  },
+  {
+    "text": "Kekayaan adalah hasil sampingan dari efisiensi yang konsisten dan pelayanan yang tak kenal lelah.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Fokus pada apa yang bisa kamu kendalikan: tabunganmu, pengeluaranmu, dan etika kerjamu.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Arus kas yang sehat memberi kamu daya tawar dan kekuatan untuk menegosiasikan masa depanmu.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Orang sukses mengambil tanggung jawab penuh atas setiap rupiah yang masuk dan keluar dari hidup mereka.",
+    "author": "Jim Rohn"
+  },
+  {
+    "text": "Keberanian mengambil keputusan saat kondisi tidak pasti adalah pembeda antara pemimpin dan pengikut.",
+    "author": "Jeff Bezos"
+  },
+  {
+    "text": "Kekayaan adalah maraton ketahanan mental, bukan perlombaan pamer di media sosial.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Bangun aset yang memiliki daya tahan terhadap inflasi dan perubahan zaman.",
+    "author": "Ray Dalio"
+  },
+  {
+    "text": "Ketika kamu memperlakukan pelanggan dengan adil, kesuksesan finansial akan mengejarmu.",
+    "author": "Sam Walton"
+  },
+  {
+    "text": "Kebebasan finansial adalah hadiah bagi mereka yang menolak diperbudak oleh tren gaya hidup sesaat.",
+    "author": "Thomas J. Stanley"
+  },
+  {
+    "text": "Jangan pernah berhenti menguji asumsimu tentang bagaimana uang bekerja.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Uang adalah energi yang harus dialirkan ke tempat-tempat produktif yang menghasilkan kebaikan.",
+    "author": "Andrew Carnegie"
+  },
+  {
+    "text": "Kemakmuran sejati adalah harmoni antara kesehatan fisik, ketenangan mental, dan kecukupan modal.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Satu-satunya batas pertumbuhan finansialmu adalah batas imajinasi dan disiplin eksekusimu.",
+    "author": "Napoleon Hill"
+  },
+  {
+    "text": "Kelola bisnismu dan keuangan pribadimu dengan transparansi tanpa kompromi.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Setiap kegagalan finansial adalah modul pelajaran berharga untuk kesuksesan yang lebih besar.",
+    "author": "Jack Ma"
+  },
+  {
+    "text": "Fokuslah pada gambaran besar kebebasan hidupmu, bukan pada barang-barang konsumtif kecil di sekelilingmu.",
+    "author": "Morgan Housel"
+  },
+  {
+    "text": "Jadilah tuan atas modalmu, bukan hamba dari keinginan impulsifmu.",
+    "author": "John D. Rockefeller"
+  },
+  {
+    "text": "Kekayaan yang sesungguhnya adalah ketika kamu tidak lagi harus menjual waktumu untuk bertahan hidup.",
+    "author": "Naval Ravikant"
+  },
+  {
+    "text": "Mulailah dari tempatmu berada, gunakan apa yang kamu miliki, dan bangun dengan konsistensi tanpa henti.",
+    "author": "Arthur Ashe"
+  },
+  {
+    "text": "Kemandirian finansial adalah hadiah terindah yang bisa kamu berikan untuk masa depan keluargamu.",
+    "author": "Dave Ramsey"
+  },
+  {
+    "text": "Langkah pertama menuju kekayaan dimulai pada detik kamu memutuskan untuk mengendalikan pengeluaranmu hari ini.",
+    "author": "Warren Buffett"
+  },
+  {
+    "text": "Bekerjalah dengan tekun, tabunglah dengan cerdas, investasikan dengan sabar, dan nikmati kebebasanmu sepenuhnya.",
+    "author": "Charlie Munger"
+  },
+  {
+    "text": "Masa depan finansialmu ditentukan oleh apa yang kamu lakukan dengan pemasukan bulan ini.",
+    "author": "Ray Dalio"
+  }
+];
+
+if (typeof window !== 'undefined') {
+  window.billionaireQuotes = billionaireQuotes;
+}
+
+const defaultFinancialData = {
+  settings: {
+    paydayConfig: {
+      dayOfMonth: 25,
+      salaryAmount: 5000000,
+      lastUpdated: null // String "YYYY-MM"
+    },
+    reminderEnabled: true,
+    reminderTime: "20:00"
+  },
+  wallets: [
+    { id: "w-bank", name: "Bank Account", type: "Bank", balance: 3000000, initialBalance: 3000000, icon: "landmark", color: "#3B82F6" },
+    { id: "w-ewallet", name: "E-Wallet", type: "E-Wallet", balance: 1000000, initialBalance: 1000000, icon: "wallet", color: "#10B981" },
+    { id: "w-cash", name: "Cash / Tunai", type: "Tunai", balance: 1000000, initialBalance: 1000000, icon: "banknote", color: "#F59E0B" }
+  ],
+  transactions: {
+    incomes: [],  // { id, title, amount, walletId, quadrant: 1|2|3|4, date, icon }
+    expenses: [], // { id, title, amount, walletId, quadrant: 1|2|3|4, expenseType: "needs"|"wants", date, icon }
+    savings: []   // { id, title, targetAmount, currentAmount, walletId, quadrant: 1|2|3|4, date, notes }
+  },
+  evaluations: [
+    // { id, periodKey: "YYYY-MM", totalIncome, totalExpense, savingRatio, status: "over"|"under", notes, createdAt }
+  ],
+  quotes: billionaireQuotes
+};
+
+const EISENHOWER_QUADRANTS = {
+  1: {
+    id: 1,
+    label: 'Penting & Mendesak',
+    color: '#EF4444',
+    badgeClass: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    description: 'Krisis, deadline mendesak, tagihan wajib'
+  },
+  2: {
+    id: 2,
+    label: 'Penting & Tidak Mendesak',
+    color: '#F59E0B',
+    badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    description: 'Tabungan masa depan, investasi, pengembangan diri'
+  },
+  3: {
+    id: 3,
+    label: 'Tidak Penting & Tidak Mendesak',
+    color: '#6B7280',
+    badgeClass: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
+    description: 'Pengeluaran impulsif, hiburan berlebih'
+  },
+  4: {
+    id: 4,
+    label: 'Tidak Penting & Mendesak',
+    color: '#3B82F6',
+    badgeClass: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+    description: 'Ajakan mendadak, diskon flash sale'
+  }
+};
 
 const DEFAULT_FINANCE_SCHEMA = {
   Income: {
@@ -11,7 +1076,7 @@ const DEFAULT_FINANCE_SCHEMA = {
       {
         groupName: 'Sumber Pemasukan',
         items: [
-          { id: 'inc_utama', name: 'Pendapatan Utama', icon: 'briefcase', defaultBudget: 0, noBudget: true },
+          { id: 'inc_gaji', name: 'Gaji Bulanan', icon: 'briefcase', defaultBudget: 0, noBudget: true },
           { id: 'inc_tambahan', name: 'Sumber Tambahan', icon: 'sparkles', defaultBudget: 0, noBudget: true }
         ]
       }
@@ -27,8 +1092,7 @@ const DEFAULT_FINANCE_SCHEMA = {
           { id: 'exp_transportasi', name: 'Transportasi', icon: 'fuel', defaultBudget: 0 },
           { id: 'exp_internet', name: 'Internet', icon: 'wifi', defaultBudget: 0 },
           { id: 'exp_jajan', name: 'Jajan', icon: 'coffee', defaultBudget: 0 },
-          { id: 'exp_sedekah', name: 'Sedekah', icon: 'heart-handshake', defaultBudget: 0 },
-          { id: 'exp_lainnya', name: 'Lainnya', icon: 'layers', defaultBudget: 0 }
+          { id: 'exp_sedekah', name: 'Sedekah', icon: 'heart-handshake', defaultBudget: 0 }
         ]
       }
     ]
@@ -47,7 +1111,7 @@ const DEFAULT_FINANCE_SCHEMA = {
   }
 };
 
-const DEFAULT_WALLETS = [];
+const DEFAULT_WALLETS = defaultFinancialData.wallets;
 
 /**
  * Terjemahan Nama Kategori Default agar ikut berubah sesuai bahasa yang dipilih
@@ -62,6 +1126,16 @@ const CATEGORY_TRANSLATIONS = {
     zh: '主要收入',
     ar: 'الدخل الأساسي',
     es: 'Ingreso Principal'
+  },
+  'Gaji Bulanan': {
+    id: 'Gaji Bulanan',
+    en: 'Monthly Salary',
+    ms: 'Gaji Bulanan',
+    ja: '月給',
+    ko: '월급',
+    zh: '月薪',
+    ar: 'الراتب الشهري',
+    es: 'Salario Mensual'
   },
   'Sumber Tambahan': {
     id: 'Sumber Tambahan',
@@ -311,6 +1385,90 @@ const I18N_TRANSLATIONS = {
     sec_recent_tx: 'Transaksi Terbaru',
     btn_view_all: 'Lihat Semua',
     empty_tx_period: 'Belum ada transaksi pada periode ini',
+    // Dynamic Quotes
+    quotes_card_title: 'Kutipan Inspiratif Keuangan',
+    quotes_card_sub: 'Insight dari tokoh & investor dunia untuk memandu keuangan Anda',
+    quotes_refresh_title: 'Ganti Kutipan',
+    quotes_auto_interval: 'Auto-rotasi 15s',
+
+    // Siklus Gaji
+    salary_cycle_title: 'Siklus Gaji & Penghasilan Bulanan',
+    salary_cycle_desc: 'Atur tanggal penerimaan gaji dan nominal bulanan. Periode keuangan akan otomatis terhitung dari tanggal gajian ini.',
+    payday_date_label: 'Tanggal Penerimaan Gaji (1 – 31)',
+    salary_amount_label: 'Nominal Gaji Bulanan (Rp)',
+    salary_save_btn: 'Simpan Siklus Gaji',
+    salary_locked_btn: 'Terkunci Bulan Ini',
+    salary_locked_notice: 'Pengaturan gaji telah diperbarui untuk siklus bulan ini. Perubahan berikutnya dapat dilakukan bulan depan.',
+    salary_cycle_active: 'Siklus Periode Aktif',
+    salary_cycle_unlocked: 'Dapat Diubah',
+    salary_cycle_locked: 'Terkunci',
+
+    // Eisenhower 4 Quadrants (Tanpa Prefix Q1-Q4)
+    quadrant_title: 'Prioritas Kuadran (Eisenhower Matrix)',
+    quadrant_all: 'Semua Kuadran',
+    quadrant_1: 'Penting & Mendesak',
+    quadrant_2: 'Penting & Tdk Mendesak',
+    quadrant_3: 'Tdk Penting & Tdk Mendesak',
+    quadrant_4: 'Tdk Penting & Mendesak',
+    quadrant_1_desc: 'Krisis, deadline mendesak, tagihan wajib',
+    quadrant_2_desc: 'Tabungan masa depan, investasi, perbaikan diri',
+    quadrant_3_desc: 'Pengeluaran impulsif, hiburan berlebih',
+    quadrant_4_desc: 'Ajakan mendadak, diskon flash sale',
+
+    // Needs vs Wants (Murni Bahasa Indonesia)
+    expense_type_title: 'Karakter Pengeluaran',
+    expense_type_all: 'Semua Kategori',
+    expense_type_needs: 'Kebutuhan',
+    expense_type_wants: 'Keinginan',
+    badge_needs: 'Kebutuhan',
+    badge_wants: 'Keinginan',
+
+    // Auto Evaluation Modal
+    eval_modal_title: 'Evaluasi Keuangan Berkala',
+    eval_modal_sub: 'Analisis Siklus Periode Lalu',
+    eval_budget_status: 'Status Anggaran',
+    eval_status_overbudget: 'Overbudget (Melebihi Anggaran)',
+    eval_status_underbudget: 'Underbudget (Terkendali / Hemat)',
+    eval_saving_ratio: 'Saving Ratio',
+    eval_saving_ratio_sub: 'Rasio tabungan periode lalu',
+    eval_total_income: 'Total Pemasukan:',
+    eval_total_expense: 'Total Pengeluaran:',
+    eval_budget_limit: 'Batas Budget Pengeluaran:',
+    eval_total_savings: 'Total Ditabung:',
+    eval_notes_label: 'Catatan & Refleksi Evaluasi Keuangan',
+    eval_notes_desc: 'Tuliskan refleksi singkat Anda mengenai pengeluaran, kepatuhan budget, atau target siklus berikutnya.',
+    eval_notes_placeholder: 'Contoh: Bulan lalu overbudget di pos jajan. Bulan ini batasi nongkrong dan alokasikan 20% gaji langsung ke tabungan darurat...',
+    eval_notes_error: 'Catatan evaluasi wajib diisi minimal 5 karakter sebelum menyimpan.',
+    eval_save_btn: 'Simpan Evaluasi',
+    eval_dismiss_btn: 'Tutup Sementara',
+    sec_monthly_notes: 'Catatan Evaluasi Bulanan',
+    sec_monthly_notes_sub: 'Rekap refleksi & analisis keuangan berkala dari setiap siklus gajian / awal bulan',
+    btn_open_all_notes: 'Buka Seluruh Catatan',
+    btn_new_note: 'Tulis Catatan',
+    all_notes_modal_title: 'Seluruh Catatan Evaluasi Bulanan',
+    all_notes_modal_sub: 'Histori lengkap refleksi berkala, evaluasi budget, dan rasio tabungan',
+    no_notes_yet: 'Belum ada catatan evaluasi bulanan tersimpan.',
+    no_notes_yet_sub: 'Catatan akan terisi otomatis saat Anda mengisi evaluasi pada tanggal gajian atau tanggal 1 setiap bulan, atau Anda bisa menuliskannya secara manual kapan saja.',
+
+    // Saving vs Expense Gauge
+    gauge_savings_ratio_title: 'Saving vs Expense Gauge',
+    gauge_savings_ratio_sub: 'Rasio Tabungan vs Pengeluaran',
+    gauge_healthy: 'Sangat Sehat',
+    gauge_good: 'Cukup Baik',
+    gauge_warning: 'Perlu Perhatian',
+    gauge_low: 'Rendah',
+    gauge_advice_healthy: 'Luar biasa! Rasio tabungan Anda berada di atas 30%, disiplin keuangan sangat prima.',
+    gauge_advice_standard: 'Rasio tabungan ideal minimal 20% dari total penghasilan/pengeluaran Anda.',
+    gauge_advice_low: 'Tingkatkan alokasi tabungan dan pangkas pos pengeluaran sekunder (Wants).',
+
+    // Long-Term Savings Goal
+    savings_goal_title: 'Target Tabungan Berjangka',
+    savings_goal_name: 'Nama Tujuan',
+    savings_goal_target: 'Target Dana',
+    savings_goal_collected: 'Terkumpul',
+    savings_goal_notes: 'Catatan Rencana',
+    savings_goal_progress: 'Progress Target',
+
     // Wallet
     dashboard_total_all_balance: 'TOTAL SELURUH SALDO',
     dashboard_all_balance_desc: 'Total akumulasi saldo dari semua sumber dana (Rekening Bank, Dompet Digital & Kas Tunai).',
@@ -687,7 +1845,27 @@ const I18N_TRANSLATIONS = {
     lock_screen_pin_prompt: 'Enter your 6-digit security PIN',
     lock_screen_pattern_prompt: 'Draw your unlock pattern on the 3x3 grid',
     lock_screen_fp_prompt: 'Verify your device fingerprint sensor to unlock',
-    lock_screen_forgot: 'Forgot Password? Reset Lock'
+    lock_screen_forgot: 'Forgot Password? Reset Lock',
+    quadrant_title: 'Priority Quadrant (Eisenhower Matrix)',
+    quadrant_all: 'All Quadrants',
+    quadrant_1: 'Important & Urgent',
+    quadrant_2: 'Important & Not Urgent',
+    quadrant_3: 'Not Important & Not Urgent',
+    quadrant_4: 'Not Important & Urgent',
+    expense_type_title: 'Expense Character',
+    expense_type_all: 'All Categories',
+    expense_type_needs: 'Needs',
+    expense_type_wants: 'Wants',
+    badge_needs: 'Needs',
+    badge_wants: 'Wants',
+    sec_monthly_notes: 'Monthly Evaluation Notes',
+    sec_monthly_notes_sub: 'Periodic reflection & financial review from monthly payday cycles',
+    btn_open_all_notes: 'Open All Notes',
+    btn_new_note: 'New Note',
+    all_notes_modal_title: 'All Monthly Evaluation Notes',
+    all_notes_modal_sub: 'Complete history of periodic reflections, budget reviews, and saving ratios',
+    no_notes_yet: 'No monthly evaluation notes recorded yet.',
+    no_notes_yet_sub: 'Notes will be saved automatically when you complete monthly evaluations on payday or day 1.'
   },
   ms: {
     nav_dashboard: 'Papan Pemuka',
@@ -2226,6 +3404,98 @@ const EXTRA_GOOGLE_I18N = {
     modal_google_info: 'Haga clic en su cuenta de Google vinculada al dispositivo arriba para conectarse directamente.'
   }
 };
+
+const EXTRA_LOCALIZED_REFINEMENTS = {
+  "ms": {
+    "quadrant_title": "Keutamaan Kuadran (Matriks Eisenhower)",
+    "quadrant_all": "Semua Kuadran",
+    "quadrant_1": "Penting & Mendesak",
+    "quadrant_2": "Penting & Tdk Mendesak",
+    "quadrant_3": "Tdk Penting & Tdk Mendesak",
+    "quadrant_4": "Tdk Penting & Mendesak",
+    "expense_type_title": "Sifat Perbelanjaan",
+    "expense_type_all": "Semua Kategori",
+    "expense_type_needs": "Keperluan",
+    "expense_type_wants": "Kehendak",
+    "badge_needs": "Keperluan",
+    "badge_wants": "Kehendak"
+  },
+  "ja": {
+    "quadrant_title": "優先度マトリックス",
+    "quadrant_all": "すべての象限",
+    "quadrant_1": "重要かつ緊急",
+    "quadrant_2": "重要かつ非緊急",
+    "quadrant_3": "非重要かつ非緊急",
+    "quadrant_4": "非重要かつ緊急",
+    "expense_type_title": "支出の種類",
+    "expense_type_all": "すべてのカテゴリ",
+    "expense_type_needs": "必需（ニーズ）",
+    "expense_type_wants": "欲求（ウォンツ）",
+    "badge_needs": "必需",
+    "badge_wants": "欲求"
+  },
+  "ko": {
+    "quadrant_title": "우선순위 매트릭스",
+    "quadrant_all": "전체 분면",
+    "quadrant_1": "중요하고 긴급함",
+    "quadrant_2": "중요하지만 긴급하지 않음",
+    "quadrant_3": "중요하지 않고 긴급하지 않음",
+    "quadrant_4": "중요하지 않지만 긴급함",
+    "expense_type_title": "지출 성격",
+    "expense_type_all": "전체 카테고리",
+    "expense_type_needs": "필수 지출",
+    "expense_type_wants": "선택 지출",
+    "badge_needs": "필수",
+    "badge_wants": "선택"
+  },
+  "zh": {
+    "quadrant_title": "四象限优先级",
+    "quadrant_all": "所有象限",
+    "quadrant_1": "重要且紧急",
+    "quadrant_2": "重要但不紧急",
+    "quadrant_3": "不重要且不紧急",
+    "quadrant_4": "不重要但紧急",
+    "expense_type_title": "支出属性",
+    "expense_type_all": "所有分类",
+    "expense_type_needs": "必需支出",
+    "expense_type_wants": "弹性支出",
+    "badge_needs": "必需",
+    "badge_wants": "弹性"
+  },
+  "ar": {
+    "quadrant_title": "أولويات المصفوفة",
+    "quadrant_all": "جميع الأقسام",
+    "quadrant_1": "مهم وعاجل",
+    "quadrant_2": "مهم وغير عاجل",
+    "quadrant_3": "غير مهم وغير عاجل",
+    "quadrant_4": "غير مهم وعاجل",
+    "expense_type_title": "طبيعة المصروف",
+    "expense_type_all": "جميع الفئات",
+    "expense_type_needs": "احتياجات",
+    "expense_type_wants": "رغبات",
+    "badge_needs": "احتياجات",
+    "badge_wants": "رغبات"
+  },
+  "es": {
+    "quadrant_title": "Matriz de Prioridad",
+    "quadrant_all": "Todos los Cuadrantes",
+    "quadrant_1": "Importante y Urgente",
+    "quadrant_2": "Importante y No Urgente",
+    "quadrant_3": "No Importante y No Urgente",
+    "quadrant_4": "No Importante y Urgente",
+    "expense_type_title": "Tipo de Gasto",
+    "expense_type_all": "Todas las Categorías",
+    "expense_type_needs": "Necesidades",
+    "expense_type_wants": "Deseos",
+    "badge_needs": "Necesidad",
+    "badge_wants": "Deseo"
+  }
+};
+Object.entries(EXTRA_LOCALIZED_REFINEMENTS).forEach(([lCode, keys]) => {
+  if (I18N_TRANSLATIONS[lCode]) {
+    Object.assign(I18N_TRANSLATIONS[lCode], keys);
+  }
+});
 
 Object.keys(I18N_TRANSLATIONS).forEach((langCode) => {
   const dict = I18N_TRANSLATIONS[langCode];
