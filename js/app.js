@@ -56,7 +56,9 @@ let state = {
       lastUpdated: null // String "YYYY-MM"
     },
     reminderEnabled: true,
-    reminderTime: "20:00"
+    reminderTime: "20:00",
+    reminderSound: true,
+    reminderSoundType: "coin"
   },
   transactions: [],
   budgets: {},
@@ -593,13 +595,23 @@ function loadStateFromStorage() {
         paydayConfig: { dayOfMonth: 1, salaryAmount: 5000000, lastUpdated: null },
         reminderEnabled: true,
         reminderTime: "20:00",
+        reminderSound: true,
+        reminderSoundType: "coin",
         ...JSON.parse(savedSettings)
       };
+      if (state.settings.reminderSound === undefined) {
+        state.settings.reminderSound = true;
+      }
+      if (!state.settings.reminderSoundType) {
+        state.settings.reminderSoundType = "coin";
+      }
     } else {
       state.settings = {
         paydayConfig: { dayOfMonth: 1, salaryAmount: 5000000, lastUpdated: null },
         reminderEnabled: true,
-        reminderTime: "20:00"
+        reminderTime: "20:00",
+        reminderSound: true,
+        reminderSoundType: "coin"
       };
     }
     const lastSalUpdate = localStorage.getItem('lastSalaryConfigUpdate');
@@ -2930,6 +2942,8 @@ function populateSettingsPreferencesDropdowns() {
     const langObj = SUPPORTED_LANGUAGES.find((l) => l.code === state.language) || SUPPORTED_LANGUAGES[0];
     langFlagBadge.textContent = `${langObj.flag} ${langObj.code.toUpperCase()}`;
   }
+
+  syncReminderSettingsUI();
 }
 
 function getDetectedDeviceName() {
@@ -7311,20 +7325,344 @@ function deleteMonthlyEvaluationNote(evalId) {
   showToast('Catatan evaluasi telah dihapus.', 'info');
 }
 
-// ================= REMINDER TRANSAKSI HARIAN =================
+// ================= PENGINGAT NOTIFIKASI POP-UP HP & EFEK SUARA =================
 
+/**
+ * Memainkan nada dering lonceng melodi yang jernih & elegan menggunakan Web Audio API.
+ * 100% mandiri via Web Audio API, bekerja offline, tanpa file eksternal, latensi nol.
+ */
+function playNotificationSound() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+    const t0 = ctx.currentTime;
+
+    // Nada lonceng melodi elegan dua tingkat (G5 -> E6) dengan aksen resonansi alami
+    const notes = [
+      { freq: 783.99, delay: 0.00, dur: 0.28, gain: 0.26 },  // G5
+      { freq: 1318.51, delay: 0.11, dur: 0.52, gain: 0.30 }  // E6
+    ];
+
+    notes.forEach((n) => {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(n.freq, t0 + n.delay);
+      g.gain.setValueAtTime(0.0001, t0 + n.delay);
+      g.gain.linearRampToValueAtTime(n.gain, t0 + n.delay + 0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + n.delay + n.dur);
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start(t0 + n.delay);
+      osc.stop(t0 + n.delay + n.dur + 0.05);
+
+      const over = ctx.createOscillator();
+      const overG = ctx.createGain();
+      over.type = 'triangle';
+      over.frequency.setValueAtTime(n.freq * 2.01, t0 + n.delay);
+      overG.gain.setValueAtTime(0.0001, t0 + n.delay);
+      overG.gain.linearRampToValueAtTime(n.gain * 0.22, t0 + n.delay + 0.01);
+      overG.gain.exponentialRampToValueAtTime(0.0001, t0 + n.delay + (n.dur * 0.5));
+      over.connect(overG);
+      overG.connect(ctx.destination);
+      over.start(t0 + n.delay);
+      over.stop(t0 + n.delay + (n.dur * 0.5) + 0.05);
+    });
+
+    // Lepaskan konteks audio setelah nada selesai untuk efisiensi baterai & memori
+    setTimeout(() => {
+      try {
+        if (ctx.state !== 'closed') ctx.close();
+      } catch (e) {}
+    }, 1500);
+  } catch (err) {
+    console.warn('Gagal memainkan suara notifikasi:', err);
+  }
+}
+
+/**
+ * Mengirim notifikasi sistem pop-up ke perangkat HP (status bar/layar kunci/beranda)
+ * via Service Worker registration atau fallback Web Notification API.
+ */
+async function sendNativeSystemNotification(title, options = {}) {
+  // Bunyikan nada lonceng melodi jika efek suara diaktifkan
+  if (!state.settings || state.settings.reminderSound !== false) {
+    playNotificationSound();
+  }
+
+  if (!('Notification' in window)) {
+    return false;
+  }
+
+  if (Notification.permission !== 'granted') {
+    return false;
+  }
+
+  const defaultOptions = {
+    body: 'Yuk catat transaksi pemasukan atau pengeluaranmu hari ini agar keuangan tetap rapi!',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    tag: 'tracker-daily-reminder',
+    renotify: true,
+    vibrate: [200, 100, 200, 100, 300],
+    data: { url: './' },
+    ...options
+  };
+
+  // Prioritas 1: Kirim via Service Worker (pop-up native di Android / PWA mobile)
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, defaultOptions);
+        return true;
+      }
+    } catch (err) {
+      console.warn('SW showNotification error, menggunakan fallback Notification:', err);
+    }
+  }
+
+  // Prioritas 2: Fallback Web Notification constructor
+  try {
+    new Notification(title, defaultOptions);
+    return true;
+  } catch (err) {
+    console.warn('Fallback Notification constructor error:', err);
+    return false;
+  }
+}
+
+/**
+ * Memperbarui badge status izin notifikasi di Pengaturan.
+ */
+function updateNotificationPermissionBadge() {
+  const badge = document.getElementById('notifPermissionBadge');
+  if (!badge) return;
+
+  if (!('Notification' in window)) {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800/70 text-slate-400 border border-slate-700/70 shrink-0';
+    badge.textContent = t('badge_not_supported') || 'Tidak Didukung';
+    return;
+  }
+
+  const perm = Notification.permission;
+  if (perm === 'granted') {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0';
+    badge.textContent = t('badge_permission_granted') || 'Izin Aktif ✓';
+  } else if (perm === 'denied') {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 shrink-0';
+    badge.textContent = t('badge_permission_denied') || 'Izin Ditolak ✕';
+  } else {
+    badge.className = 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 shrink-0';
+    badge.textContent = t('badge_permission_default') || 'Belum Diizinkan';
+  }
+}
+
+/**
+ * Handler saat badge status izin notifikasi diklik.
+ */
+async function handleNotificationBadgeClick() {
+  if (!('Notification' in window)) {
+    showToast('⚠️ Peramban ini tidak mendukung Web Notifications.', 'warning');
+    return;
+  }
+  if (Notification.permission === 'default') {
+    try {
+      const res = await Notification.requestPermission();
+      updateNotificationPermissionBadge();
+      if (res === 'granted') {
+        showToast('🔔 Izin notifikasi berhasil diaktifkan!', 'success');
+      }
+    } catch (e) {}
+  } else if (Notification.permission === 'granted') {
+    showToast('✅ Izin notifikasi pada perangkat ini sudah Aktif.', 'success');
+  } else if (Notification.permission === 'denied') {
+    showToast('⚠️ Izin notifikasi diblokir. Harap buka Pengaturan Browser/Situs HP Anda untuk mengizinkannya.', 'warning');
+  }
+}
+
+/**
+ * Sinkronisasi elemen UI form pengaturan pengingat dengan state aplikasi.
+ */
+function syncReminderSettingsUI() {
+  const toggleReminder = document.getElementById('toggleReminderEnabled');
+  if (toggleReminder) {
+    toggleReminder.checked = (!state.settings || state.settings.reminderEnabled !== false);
+  }
+
+  const timeInput = document.getElementById('settingsReminderTime');
+  if (timeInput) {
+    timeInput.value = (state.settings && state.settings.reminderTime) || '20:00';
+  }
+
+  const timePreview = document.getElementById('reminderTimePreviewBadge');
+  if (timePreview) {
+    timePreview.textContent = `${(state.settings && state.settings.reminderTime) || '20:00'} WIB`;
+  }
+
+  const toggleSound = document.getElementById('toggleReminderSound');
+  if (toggleSound) {
+    toggleSound.checked = (!state.settings || state.settings.reminderSound !== false);
+  }
+
+  updateNotificationPermissionBadge();
+}
+
+/**
+ * Handler saat toggle saklar pengingat harian diubah.
+ */
+function handleReminderToggleChange(enabled) {
+  if (!state.settings) state.settings = {};
+  state.settings.reminderEnabled = !!enabled;
+  saveSettingsToStorage();
+
+  if (enabled && 'Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission().then(() => {
+      updateNotificationPermissionBadge();
+    });
+  }
+
+  showToast(
+    enabled ? '🔔 Pengingat harian di HP telah diaktifkan' : '🔕 Pengingat harian dinonaktifkan',
+    'info'
+  );
+}
+
+/**
+ * Handler saat input jam pengingat diubah.
+ */
+function handleReminderTimeChange(timeVal) {
+  if (!timeVal) return;
+  if (!state.settings) state.settings = {};
+  state.settings.reminderTime = timeVal;
+  saveSettingsToStorage();
+
+  const timePreview = document.getElementById('reminderTimePreviewBadge');
+  if (timePreview) {
+    timePreview.textContent = `${timeVal} WIB`;
+  }
+  showToast(`⏰ Jam pengingat harian diatur ke ${timeVal}`, 'info');
+}
+
+/**
+ * Handler saat toggle suara notifikasi diubah.
+ */
+function handleReminderSoundChange(enabled) {
+  if (!state.settings) state.settings = {};
+  state.settings.reminderSound = !!enabled;
+  saveSettingsToStorage();
+
+  if (enabled) {
+    playNotificationSound();
+  }
+
+  showToast(
+    enabled ? '🔊 Nada dering lonceng melodi diaktifkan' : '🔇 Efek suara notifikasi dimatikan',
+    'info'
+  );
+}
+
+/**
+ * Tombol pengujian interaktif: memutar suara chime & mengirimkan notifikasi pop-up native ke HP.
+ */
+async function testNotificationAndSound() {
+  // 1. Putar nada chime langsung pada event klik (membuka kunci AudioContext di browser mobile)
+  playNotificationSound();
+
+  if (!('Notification' in window)) {
+    showToast('⚠️ Peramban ini tidak mendukung Web Notifications.', 'warning');
+    return;
+  }
+
+  let perm = Notification.permission;
+  if (perm === 'default') {
+    try {
+      perm = await Notification.requestPermission();
+      updateNotificationPermissionBadge();
+    } catch (e) {
+      console.warn('Request permission error:', e);
+    }
+  }
+
+  if (perm === 'granted') {
+    updateNotificationPermissionBadge();
+    const sent = await sendNativeSystemNotification('🔔 Tes Pengingat Keuangan Berhasil!', {
+      body: 'Notifikasi pop-up dan suara pengingat HP Anda aktif! Catat transaksi jadi lebih tertib & disiplin.',
+      tag: 'tracker-test-notif',
+      renotify: true
+    });
+    if (sent) {
+      showToast('🔔 Notifikasi pop-up dan suara berhasil dikirim ke perangkat Anda!', 'success');
+    } else {
+      showToast('🔔 Suara berbunyi. Pastikan izin notifikasi aktif di browser/perangkat Anda.', 'info');
+    }
+  } else if (perm === 'denied') {
+    updateNotificationPermissionBadge();
+    showToast('⚠️ Izin notifikasi diblokir. Harap aktifkan izin di Pengaturan Situs/Browser HP Anda.', 'warning');
+  } else {
+    showToast('ℹ️ Izin notifikasi belum diberikan. Silakan pilih "Izinkan" saat diminta.', 'info');
+  }
+}
+
+/**
+ * Daftarkan Periodic Background Sync jika didukung (untuk PWA Chrome Android)
+ */
+async function registerPeriodicDailyReminder() {
+  if ('serviceWorker' in navigator && 'periodicSync' in ServiceWorkerRegistration.prototype) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const tags = await reg.periodicSync.getTags();
+      if (!tags.includes('daily-financial-reminder')) {
+        await reg.periodicSync.register('daily-financial-reminder', {
+          minInterval: 12 * 60 * 60 * 1000 // 12 jam
+        });
+      }
+    } catch (e) {
+      // Fitur belum diizinkan atau tidak didukung oleh browser OS ini
+    }
+  }
+}
+
+/**
+ * Pengecekan cerdas pengingat transaksi harian:
+ * Muncul saat waktu pengingat tiba (default 20:00) jika belum ada transaksi hari ini.
+ */
 function checkDailyReminder() {
-  if (!state.settings || !state.settings.reminderEnabled) return;
+  if (!state.settings || state.settings.reminderEnabled === false) return;
   const todayStr = getTodayLocalISO();
   const reminderKey = `ft_reminder_shown_${todayStr}`;
   if (localStorage.getItem(reminderKey)) return;
 
-  const todayHasTx = state.transactions.some((tx) => tx.date === todayStr);
-  if (!todayHasTx) {
-    setTimeout(() => {
-      showToast('🔔 Jangan lupa mencatat transaksi keuangan harianmu hari ini!', 'info');
-      localStorage.setItem(reminderKey, 'true');
-    }, 2500);
+  // Lewati pengingat jika pengguna sudah mencatat transaksi hari ini
+  const todayHasTx = state.transactions && state.transactions.some((tx) => tx.date === todayStr);
+  if (todayHasTx) return;
+
+  // Evaluasi waktu sekarang terhadap target jam pengingat (contoh: "20:00")
+  const reminderTime = state.settings.reminderTime || "20:00";
+  const [remHStr, remMStr] = reminderTime.split(':');
+  const remH = parseInt(remHStr, 10);
+  const remM = parseInt(remMStr, 10);
+  const targetMinutes = (isNaN(remH) ? 20 : remH) * 60 + (isNaN(remM) ? 0 : remM);
+
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  if (nowMinutes >= targetMinutes) {
+    localStorage.setItem(reminderKey, 'true');
+
+    // Kirim notifikasi pop-up native beserta suara
+    sendNativeSystemNotification('🔔 Pengingat Catatan Keuangan', {
+      body: 'Kamu belum mencatat transaksi keuangan hari ini. Yuk catat pengeluaran dan pemasukanmu sekarang!',
+      tag: 'tracker-daily-reminder',
+      renotify: true
+    });
+
+    // Munculkan toast jika aplikasi sedang terbuka
+    showToast('🔔 Jangan lupa mencatat transaksi keuangan harianmu hari ini!', 'info');
   }
 }
 
@@ -8912,6 +9250,16 @@ function initApp() {
   initQuotesRotation();
   checkAutoEvaluationTrigger();
   checkDailyReminder();
+
+  // Pengecekan cerdas berkala untuk pengingat harian (setiap 60 detik)
+  setInterval(checkDailyReminder, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      checkDailyReminder();
+      updateNotificationPermissionBadge();
+    }
+  });
+  registerPeriodicDailyReminder();
 
   initPwaInstallButton();
   initNetworkAutoSyncListener();

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'financetracker-pwa-v26';
+const CACHE_NAME = 'financetracker-pwa-v30';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -50,3 +50,49 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(event.request))
   );
 });
+
+// ================= NOTIFIKASI POP-UP SISTEM & BACKGROUND REMINDER =================
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const urlToOpen = (event.notification.data && event.notification.data.url) ? event.notification.data.url : './';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url && client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
+      }
+    })
+  );
+});
+
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+  if (event.data.type === 'SHOW_NOTIFICATION') {
+    const title = event.data.title || 'Tracker Keuangan';
+    const options = event.data.options || {};
+    self.registration.showNotification(title, options);
+  }
+});
+
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === 'daily-financial-reminder') {
+    event.waitUntil(
+      self.registration.showNotification('Catatan Keuangan Harian', {
+        body: 'Saatnya review keuangan harianmu! Jangan lupa catat transaksi hari ini agar tetap rapi.',
+        icon: './icon-192.png',
+        badge: './icon-192.png',
+        tag: 'tracker-daily-reminder',
+        renotify: true,
+        vibrate: [200, 100, 200],
+        data: { url: './' }
+      })
+    );
+  }
+});
+
