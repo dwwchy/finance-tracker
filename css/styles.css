@@ -1448,4 +1448,40 @@ html.light .badge-q4 {
   border-color: #bfdbfe !important;
 }
 
+/* ==========================================================================
+   BUKTI FOTO TRANSAKSI (UPLOAD & LIGHTBOX)
+   ========================================================================== */
+#txProofImageEmptyState {
+  transition: all 0.2s ease;
+}
+
+#txProofImageEmptyState:hover {
+  background-color: rgba(16, 185, 129, 0.06);
+}
+
+html.light #txProofImageEmptyState {
+  border-color: #cbd5e1 !important;
+  background-color: #f8fafc !important;
+}
+
+html.light #txProofImageEmptyState:hover {
+  border-color: #10b981 !important;
+  background-color: rgba(16, 185, 129, 0.08) !important;
+}
+
+html.light #txProofImagePreviewState {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light #modalProofImageViewer .modal-panel {
+  background-color: #ffffff !important;
+}
+
+html.light #modalProofImageViewer [class*="bg-slate-950"] {
+  background-color: #f1f5f9 !important;
+  border-color: #e2e8f0 !important;
+}
+
+
 

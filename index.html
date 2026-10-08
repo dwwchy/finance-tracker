@@ -50,7 +50,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
 
   <!-- Custom Styles -->
-  <link rel="stylesheet" href="css/styles.css?v=31" />
+  <link rel="stylesheet" href="css/styles.css?v=36" />
 </head>
 <body class="antialiased selection:bg-emerald-500 selection:text-slate-950 pb-24 md:pb-10">
 
@@ -1741,6 +1741,101 @@
           />
         </div>
 
+        <!-- Foto Bukti Transaksi (Opsional) -->
+        <div id="txProofImageContainer" class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-300">
+            <span data-i18n="modal_tx_photo_label">Foto Bukti Transaksi</span> <span data-i18n="modal_tx_optional" class="text-slate-500 font-normal">(Opsional)</span>
+          </label>
+          <input
+            type="file"
+            id="txProofImageInput"
+            accept="image/*"
+            class="hidden"
+            onchange="handleProofImageSelected(event)"
+          />
+
+          <!-- Upload Dropzone / Trigger Area (Ketika belum ada foto) -->
+          <div
+            id="txProofImageEmptyState"
+            onclick="triggerProofImageUpload()"
+            class="cursor-pointer border-2 border-dashed border-slate-700/80 hover:border-emerald-500/80 hover:bg-slate-800/40 rounded-xl p-3 sm:p-3.5 text-center transition-all group"
+          >
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-slate-800 group-hover:bg-emerald-500/20 text-slate-400 group-hover:text-emerald-400 flex items-center justify-center transition-colors shrink-0">
+                <i data-lucide="camera" class="w-4 h-4"></i>
+              </div>
+              <div class="text-left min-w-0">
+                <div class="text-xs font-semibold text-slate-200 group-hover:text-emerald-300 transition-colors">
+                  <span data-i18n="modal_tx_photo_upload">Unggah Foto / Bukti Struk</span>
+                </div>
+                <p class="text-[10px] text-slate-400 truncate" data-i18n="modal_tx_photo_hint">
+                  Nota, struk belanja, atau bukti transfer (Bisa Paste Ctrl+V)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preview Area (Ketika foto sudah dipilih atau saat edit transaksi) -->
+          <div
+            id="txProofImagePreviewState"
+            class="hidden rounded-xl bg-slate-950/70 border border-slate-800/90 p-2.5 flex items-center justify-between gap-3"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              <div
+                class="relative w-12 h-12 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 shrink-0 cursor-pointer group"
+                onclick="previewCurrentModalProofImage()"
+                title="Klik untuk melihat bukti foto penuh"
+              >
+                <img
+                  id="txProofImageThumbnail"
+                  src=""
+                  alt="Bukti Transaksi"
+                  class="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                />
+                <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                  <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i>
+                </div>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span data-i18n="modal_tx_photo_attached" class="text-xs font-semibold text-slate-200 truncate">Foto Bukti Terlampir</span>
+                </div>
+                <div id="txProofImageMeta" data-i18n="modal_tx_photo_ready" class="text-[10px] text-slate-400 mt-0.5 truncate">
+                  Siap disimpan bersama transaksi
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onclick="previewCurrentModalProofImage()"
+                class="p-1.5 rounded-lg text-slate-300 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+                title="Lihat Penuh"
+              >
+                <i data-lucide="eye" class="w-4 h-4"></i>
+              </button>
+              <button
+                type="button"
+                onclick="triggerProofImageUpload()"
+                class="p-1.5 rounded-lg text-slate-300 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
+                title="Ganti Foto"
+              >
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              </button>
+              <button
+                type="button"
+                onclick="removeProofImage()"
+                class="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-500/20 transition-colors"
+                title="Hapus Foto"
+              >
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Action Buttons -->
         <div class="pt-3 border-t border-slate-800 flex items-center justify-end gap-2.5">
           <button
@@ -1760,6 +1855,93 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ================= MODAL: LIHAT BUKTI FOTO TRANSAKSI ================= -->
+  <div
+    id="modalProofImageViewer"
+    class="hidden fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 modal-backdrop"
+    role="dialog"
+    aria-modal="true"
+    onclick="if (event.target === this) closeProofImageViewer()"
+  >
+    <div class="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-700/80 shadow-2xl overflow-hidden modal-panel max-h-[92vh] flex flex-col">
+      <!-- Modal Header -->
+      <div class="px-5 py-3.5 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <i data-lucide="receipt" class="w-4 h-4"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2">
+              <h3 id="proofViewerTitle" class="text-sm sm:text-base font-bold text-white truncate" data-i18n="modal_photo_viewer_title">Bukti Transaksi</h3>
+              <span id="proofViewerTypeBadge" class="hidden"></span>
+            </div>
+            <p id="proofViewerDate" class="text-[11px] text-slate-400 font-mono-num"></p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onclick="closeProofImageViewer()"
+          class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-4 sm:p-5 space-y-3.5 overflow-y-auto max-h-[calc(92vh-120px)] flex flex-col items-center">
+        <!-- Image Container -->
+        <div class="w-full rounded-xl bg-slate-950/80 border border-slate-800/90 p-2 flex items-center justify-center overflow-hidden min-h-[200px] max-h-[58vh]">
+          <img
+            id="proofViewerImage"
+            src=""
+            alt="Foto Bukti Transaksi"
+            class="max-h-[55vh] max-w-full object-contain rounded-lg shadow-md select-none"
+          />
+        </div>
+
+        <!-- Summary Details Card -->
+        <div class="w-full rounded-xl bg-slate-950/50 border border-slate-800/80 p-3 flex items-center justify-between gap-3 text-xs">
+          <div class="min-w-0 space-y-0.5">
+            <span class="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Detail Transaksi</span>
+            <div id="proofViewerDetails" class="text-slate-300 truncate"></div>
+          </div>
+          <div id="proofViewerAmount" class="font-mono-num text-sm sm:text-base font-extrabold text-emerald-400 shrink-0"></div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-5 py-3 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between gap-2.5">
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            id="btnDownloadProofImage"
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all"
+            title="Simpan foto ke perangkat"
+          >
+            <i data-lucide="download" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span data-i18n="btn_download_proof">Unduh Foto</span>
+          </button>
+          <button
+            type="button"
+            id="btnOpenProofInNewTab"
+            class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 transition-all"
+            title="Buka gambar penuh di tab baru"
+          >
+            <i data-lucide="external-link" class="w-3.5 h-3.5 text-blue-400"></i>
+            <span data-i18n="btn_open_full">Buka Penuh</span>
+          </button>
+        </div>
+        <button
+          type="button"
+          onclick="closeProofImageViewer()"
+          class="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+        >
+          Tutup
+        </button>
+      </div>
     </div>
   </div>
 
@@ -2406,13 +2588,13 @@
   <div id="toastContainer" class="fixed bottom-20 md:bottom-5 right-4 z-50 flex flex-col gap-2 max-w-[90vw]"></div>
 
   <!-- Scripts -->
-  <script src="js/data.js?v=34"></script>
-  <script src="js/app.js?v=35"></script>
+  <script src="js/data.js?v=36"></script>
+  <script src="js/app.js?v=36"></script>
   <script>
     if ('caches' in window) {
       caches.keys().then((keys) => {
         keys.forEach((k) => {
-          if (k !== 'financetracker-pwa-v25') caches.delete(k);
+          if (k !== 'financetracker-pwa-v26') caches.delete(k);
         });
       }).catch(() => {});
     }

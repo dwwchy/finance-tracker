@@ -673,7 +673,12 @@ function setPendingDriveSync(pending) {
 }
 
 function saveTransactionsToStorage() {
-  localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(state.transactions));
+  try {
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(state.transactions));
+  } catch (err) {
+    console.error('Storage quota exceeded:', err);
+    showToast('Penyimpanan lokal hampir penuh. Hapus beberapa foto bukti lama atau cadangkan ke Google Drive.', 'error');
+  }
   setPendingDriveSync(true);
   triggerSilentAutoBackupIfConnected();
 }
@@ -1601,6 +1606,20 @@ function buildIncomeDesktopRowHTML(item, tracked, totalIncome) {
   const escapedName = item.name.replace(/'/g, "\\'");
   const displayCatName = translateCategoryName(item.name);
 
+  const catProofs = state.transactions.filter(
+    (tx) => tx.category === item.name && tx.proofImage && isTransactionInSelectedPeriod(tx)
+  );
+  const proofBtn = catProofs.length > 0 ? `
+    <button
+      type="button"
+      onclick="openProofImageViewer('${catProofs[0].id}')"
+      title="${t('btn_view_proof')} (${catProofs.length})"
+      class="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all text-xs flex items-center gap-1"
+    >
+      <i data-lucide="image" class="w-3.5 h-3.5"></i>
+    </button>
+  ` : '';
+
   return `
     <tr class="group">
       <td class="py-3.5 pl-4 pr-3 whitespace-nowrap">
@@ -1615,6 +1634,7 @@ function buildIncomeDesktopRowHTML(item, tracked, totalIncome) {
             </div>
           </div>
           <div class="flex items-center gap-1">
+            ${proofBtn}
             <button
               onclick="openQuickAddModal('Income', '${escapedName}')"
               title="+ ${displayCatName}"
@@ -1663,6 +1683,20 @@ function buildIncomeMobileCardHTML(item, tracked, totalIncome) {
   const escapedName = item.name.replace(/'/g, "\\'");
   const displayCatName = translateCategoryName(item.name);
 
+  const catProofs = state.transactions.filter(
+    (tx) => tx.category === item.name && tx.proofImage && isTransactionInSelectedPeriod(tx)
+  );
+  const proofBtn = catProofs.length > 0 ? `
+    <button
+      type="button"
+      onclick="openProofImageViewer('${catProofs[0].id}')"
+      title="${t('btn_view_proof')} (${catProofs.length})"
+      class="p-2 rounded-lg bg-emerald-500/15 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
+    >
+      <i data-lucide="image" class="w-4 h-4"></i>
+    </button>
+  ` : '';
+
   return `
     <div class="p-3.5 rounded-xl bg-slate-900/65 border border-slate-800 space-y-2.5">
       <div class="flex items-center justify-between gap-2">
@@ -1680,6 +1714,7 @@ function buildIncomeMobileCardHTML(item, tracked, totalIncome) {
           <span class="font-mono-num text-[11px] font-semibold px-2 py-0.5 rounded-full border text-emerald-300 bg-emerald-500/15 border-emerald-500/30">
             ${sharePct.toFixed(0)}%
           </span>
+          ${proofBtn}
           <button
             onclick="openQuickAddModal('Income', '${escapedName}')"
             class="p-2 rounded-lg bg-emerald-500/15 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
@@ -1733,6 +1768,20 @@ function buildCategoryDesktopRowHTML(item, tracked, budget, type) {
   const escapedName = item.name.replace(/'/g, "\\'");
   const displayCatName = translateCategoryName(item.name);
 
+  const catProofs = state.transactions.filter(
+    (tx) => tx.category === item.name && tx.proofImage && (type === 'Savings' ? true : isTransactionInSelectedPeriod(tx))
+  );
+  const proofBtn = catProofs.length > 0 ? `
+    <button
+      type="button"
+      onclick="openProofImageViewer('${catProofs[0].id}')"
+      title="${t('btn_view_proof')} (${catProofs.length})"
+      class="p-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all text-xs flex items-center gap-1"
+    >
+      <i data-lucide="image" class="w-3.5 h-3.5"></i>
+    </button>
+  ` : '';
+
   if (item.noBudget) {
     const barFill = tracked > 0 ? 100 : 0;
     return `
@@ -1749,6 +1798,7 @@ function buildCategoryDesktopRowHTML(item, tracked, budget, type) {
               </div>
             </div>
             <div class="flex items-center gap-1">
+              ${proofBtn}
               <button
                 onclick="openQuickAddModal('${type}', '${escapedName}')"
                 title="+ ${displayCatName}"
@@ -1819,6 +1869,7 @@ function buildCategoryDesktopRowHTML(item, tracked, budget, type) {
             </div>
           </div>
           <div class="flex items-center gap-1">
+            ${proofBtn}
             <button
               onclick="openQuickAddModal('${type}', '${escapedName}')"
               title="+ ${displayCatName}"
@@ -1885,6 +1936,20 @@ function buildCategoryMobileCardHTML(item, tracked, budget, type) {
   const escapedName = item.name.replace(/'/g, "\\'");
   const displayCatName = translateCategoryName(item.name);
 
+  const catProofs = state.transactions.filter(
+    (tx) => tx.category === item.name && tx.proofImage && (type === 'Savings' ? true : isTransactionInSelectedPeriod(tx))
+  );
+  const proofBtn = catProofs.length > 0 ? `
+    <button
+      type="button"
+      onclick="openProofImageViewer('${catProofs[0].id}')"
+      title="${t('btn_view_proof')} (${catProofs.length})"
+      class="p-2 rounded-lg bg-emerald-500/15 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
+    >
+      <i data-lucide="image" class="w-4 h-4"></i>
+    </button>
+  ` : '';
+
   if (item.noBudget) {
     return `
       <div class="p-3.5 rounded-xl bg-slate-900/65 border border-blue-500/25 space-y-2.5">
@@ -1900,6 +1965,7 @@ function buildCategoryMobileCardHTML(item, tracked, budget, type) {
           </div>
 
           <div class="flex items-center gap-1.5 shrink-0">
+            ${proofBtn}
             <button
               onclick="openQuickAddModal('${type}', '${escapedName}')"
               class="p-2 rounded-lg bg-emerald-500/15 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
@@ -1956,6 +2022,7 @@ function buildCategoryMobileCardHTML(item, tracked, budget, type) {
           <span class="font-mono-num text-[11px] font-semibold px-2 py-0.5 rounded-full border ${pctBadgeClass}">
             ${pct.toFixed(0)}%
           </span>
+          ${proofBtn}
           <button
             onclick="openQuickAddModal('${type}', '${escapedName}')"
             class="p-2 rounded-lg bg-emerald-500/15 active:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
@@ -2610,6 +2677,21 @@ function buildTxItemCardHTML(tx) {
         <div class="text-xs text-slate-400 truncate">
           ${tx.account}${tx.note ? ` • ${tx.note}` : ''}
         </div>
+        ${
+          tx.proofImage
+            ? `<div class="mt-1 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onclick="openProofImageViewer('${tx.id}')"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/35 transition-all shadow-sm"
+                  title="${t('btn_view_proof')}"
+                >
+                  <i data-lucide="image" class="w-2.5 h-2.5 text-emerald-400"></i>
+                  <span>${t('btn_view_proof')}</span>
+                </button>
+              </div>`
+            : ''
+        }
       </div>
 
       <div class="text-right shrink-0 flex flex-col items-end gap-1.5">
@@ -2617,6 +2699,18 @@ function buildTxItemCardHTML(tx) {
           ${sign}${formatRp(tx.amount)}
         </span>
         <div class="flex items-center gap-1">
+          ${
+            tx.proofImage
+              ? `<button
+                  type="button"
+                  onclick="openProofImageViewer('${tx.id}')"
+                  class="p-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 transition-all"
+                  title="${t('btn_view_proof')}"
+                >
+                  <i data-lucide="image" class="w-3.5 h-3.5"></i>
+                </button>`
+              : ''
+          }
           <button
             onclick="openEditTransactionModal('${tx.id}')"
             class="p-1.5 rounded-lg bg-slate-800/80 text-slate-300 hover:text-emerald-400"
@@ -2741,6 +2835,21 @@ function renderTransactionHistory(filteredTx) {
           <td class="py-3 px-3">
             <div class="text-sm font-medium text-slate-100">${displayCategory}</div>
             ${tx.note ? `<div class="text-xs text-slate-400 mt-0.5">${tx.note}</div>` : ''}
+            ${
+              tx.proofImage
+                ? `<div class="mt-1 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onclick="openProofImageViewer('${tx.id}')"
+                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 hover:bg-emerald-500/25 active:scale-95 text-emerald-300 border border-emerald-500/35 transition-all cursor-pointer shadow-sm"
+                      title="${t('btn_view_proof')}"
+                    >
+                      <i data-lucide="image" class="w-3 h-3 text-emerald-400"></i>
+                      <span>${t('btn_view_proof')}</span>
+                    </button>
+                  </div>`
+                : ''
+            }
           </td>
           <td class="py-3 px-3 whitespace-nowrap text-xs text-slate-300">
             <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-slate-800/75 border border-slate-700/70">
@@ -2753,6 +2862,18 @@ function renderTransactionHistory(filteredTx) {
           </td>
           <td class="py-3 pl-3 pr-4 text-right whitespace-nowrap">
             <div class="inline-flex items-center gap-1">
+              ${
+                tx.proofImage
+                  ? `<button
+                      type="button"
+                      onclick="openProofImageViewer('${tx.id}')"
+                      title="${t('btn_view_proof')}"
+                      class="p-1.5 rounded-lg text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/15 transition-colors"
+                    >
+                      <i data-lucide="image" class="w-3.5 h-3.5"></i>
+                    </button>`
+                  : ''
+              }
               <button
                 onclick="openEditTransactionModal('${tx.id}')"
                 title="${t('modal_tx_edit_title')}"
@@ -2773,6 +2894,10 @@ function renderTransactionHistory(filteredTx) {
       `;
     })
     .join('');
+
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
 }
 
 // ================= TAB PENGATURAN: TAMPILAN, MATA UANG, BAHASA, KEAMANAN & CADANGAN TRANSAKSI GOOGLE =================
@@ -5251,7 +5376,11 @@ function generateFinancialReportPDFDoc() {
         translateTxType(tx.type),
         translateCategoryName(tx.category),
         tx.account || '-',
-        tx.note || '-',
+        tx.note
+          ? `${tx.note}${tx.proofImage ? ' [Bukti: Ada]' : ''}`
+          : tx.proofImage
+          ? '[Bukti: Ada]'
+          : '-',
         formatRp(tx.amount)
       ]);
 
@@ -7353,6 +7482,337 @@ function setLockedTransactionDate(isoDateString) {
   }
 }
 
+// ================= BUKTI FOTO TRANSAKSI (UPLOAD, KOMPRESI, PREVIEW, LIGHTBOX) =================
+
+let currentTxProofImage = null;
+
+/**
+ * Kompresi dan resize gambar menggunakan HTML5 Canvas untuk menghemat memori LocalStorage
+ * Hasil resolusi maks 1024x1024 dengan kualitas JPEG 0.78 (~30KB - 80KB)
+ */
+function compressProofImageFile(file, maxDimension = 1024, quality = 0.78) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        let dataUrl;
+        try {
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+        } catch (err) {
+          dataUrl = e.target.result;
+        }
+        resolve(dataUrl);
+      };
+      img.onerror = () => reject(new Error('Gagal memproses file gambar'));
+      img.src = e.target.result;
+    };
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function processAndSetProofImage(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showToast('Pilih file gambar yang valid (JPG, PNG, WebP).', 'error');
+    return;
+  }
+
+  const metaEl = document.getElementById('txProofImageMeta');
+  if (metaEl) metaEl.textContent = 'Mengompres gambar...';
+
+  try {
+    const compressedDataUrl = await compressProofImageFile(file, 1024, 0.78);
+    setProofImageUI(compressedDataUrl);
+    showToast('Foto bukti transaksi berhasil diunggah!');
+  } catch (err) {
+    console.error('Compress error:', err);
+    showToast('Gagal memproses gambar.', 'error');
+  }
+}
+
+function handleProofImageSelected(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  processAndSetProofImage(file);
+}
+
+function triggerProofImageUpload() {
+  const fileInput = document.getElementById('txProofImageInput');
+  if (fileInput) {
+    fileInput.value = '';
+    fileInput.click();
+  }
+}
+
+function removeProofImage() {
+  currentTxProofImage = null;
+  const fileInput = document.getElementById('txProofImageInput');
+  if (fileInput) fileInput.value = '';
+  setProofImageUI(null);
+  showToast('Foto bukti transaksi dihapus.');
+}
+
+function resetProofImageUI() {
+  currentTxProofImage = null;
+  const fileInput = document.getElementById('txProofImageInput');
+  if (fileInput) fileInput.value = '';
+
+  const emptyEl = document.getElementById('txProofImageEmptyState');
+  const previewEl = document.getElementById('txProofImagePreviewState');
+  const thumbEl = document.getElementById('txProofImageThumbnail');
+
+  if (emptyEl) emptyEl.classList.remove('hidden');
+  if (previewEl) previewEl.classList.add('hidden');
+  if (thumbEl) thumbEl.src = '';
+}
+
+function setProofImageUI(dataUrl) {
+  currentTxProofImage = dataUrl || null;
+
+  const emptyEl = document.getElementById('txProofImageEmptyState');
+  const previewEl = document.getElementById('txProofImagePreviewState');
+  const thumbEl = document.getElementById('txProofImageThumbnail');
+  const metaEl = document.getElementById('txProofImageMeta');
+
+  if (dataUrl) {
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (previewEl) previewEl.classList.remove('hidden');
+    if (thumbEl) thumbEl.src = dataUrl;
+    if (metaEl) {
+      const approxKb = Math.round((dataUrl.length * 0.75) / 1024);
+      metaEl.textContent = `Tersimpan • ~${approxKb} KB • Siap dicatat`;
+    }
+  } else {
+    if (emptyEl) emptyEl.classList.remove('hidden');
+    if (previewEl) previewEl.classList.add('hidden');
+    if (thumbEl) thumbEl.src = '';
+  }
+  if (window.lucide) window.lucide.createIcons();
+}
+
+function previewCurrentModalProofImage() {
+  if (!currentTxProofImage) return;
+  const type = document.getElementById('txType').value;
+  const category = document.getElementById('txCategory').value;
+  const amount = parseFormattedNumber(document.getElementById('txAmount').value);
+  const account = document.getElementById('txAccount').value;
+  const note = document.getElementById('txNote').value;
+  const date = document.getElementById('txDate').value || getTodayLocalISO();
+
+  openProofImageViewer(currentTxProofImage, {
+    type,
+    category,
+    amount,
+    account,
+    note,
+    date
+  });
+}
+
+function openProofImageViewer(target, fallbackMeta = {}) {
+  let imgUrl = null;
+  let meta = { ...fallbackMeta };
+
+  if (typeof target === 'string') {
+    if (target.startsWith('data:image/') || target.startsWith('blob:') || target.startsWith('http')) {
+      imgUrl = target;
+    } else {
+      const tx = state.transactions.find((t) => t.id === target);
+      if (tx) {
+        imgUrl = tx.proofImage;
+        meta = {
+          type: tx.type,
+          category: tx.category,
+          amount: tx.amount,
+          account: tx.account,
+          date: tx.date,
+          note: tx.note
+        };
+      }
+    }
+  }
+
+  if (!imgUrl) {
+    showToast('Foto bukti transaksi tidak ditemukan.', 'error');
+    return;
+  }
+
+  const imgEl = document.getElementById('proofViewerImage');
+  if (imgEl) imgEl.src = imgUrl;
+
+  const titleEl = document.getElementById('proofViewerTitle');
+  if (titleEl) {
+    const catName = meta.category ? translateCategoryName(meta.category) : 'Bukti Transaksi';
+    titleEl.textContent = catName;
+  }
+
+  const badgeEl = document.getElementById('proofViewerTypeBadge');
+  if (badgeEl && meta.type) {
+    const isInc = meta.type === 'Income';
+    const isSav = meta.type === 'Savings';
+    badgeEl.textContent = translateTxType(meta.type);
+    badgeEl.className = `inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${
+      isInc
+        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+        : isSav
+        ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+        : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+    }`;
+    badgeEl.classList.remove('hidden');
+  } else if (badgeEl) {
+    badgeEl.classList.add('hidden');
+  }
+
+  const amountEl = document.getElementById('proofViewerAmount');
+  if (amountEl) {
+    if (meta.amount !== undefined && meta.amount !== null && meta.amount > 0) {
+      amountEl.textContent = formatRp(meta.amount);
+      amountEl.classList.remove('hidden');
+    } else {
+      amountEl.classList.add('hidden');
+    }
+  }
+
+  const dateEl = document.getElementById('proofViewerDate');
+  if (dateEl) {
+    if (meta.date) {
+      const d = new Date(meta.date + 'T00:00:00');
+      dateEl.textContent = d.toLocaleDateString(getActiveLocale(), {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+      dateEl.classList.remove('hidden');
+    } else {
+      dateEl.classList.add('hidden');
+    }
+  }
+
+  const metaDetailsEl = document.getElementById('proofViewerDetails');
+  if (metaDetailsEl) {
+    const details = [];
+    if (meta.account) details.push(`<span class="inline-flex items-center gap-1"><i data-lucide="wallet" class="w-3 h-3 text-emerald-400"></i> ${meta.account}</span>`);
+    if (meta.note) details.push(`<span class="italic text-slate-400">"${escapeHTML(meta.note)}"</span>`);
+    metaDetailsEl.innerHTML = details.length > 0 ? details.join(' • ') : '<span class="text-slate-500">Tanpa keterangan tambahan</span>';
+  }
+
+  const downloadBtn = document.getElementById('btnDownloadProofImage');
+  if (downloadBtn) {
+    downloadBtn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = imgUrl;
+      const slug = (meta.category || 'transaksi').toLowerCase().replace(/\s+/g, '_');
+      a.download = `bukti_${slug}_${meta.date || getTodayLocalISO()}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('Foto bukti transaksi berhasil diunduh!');
+    };
+  }
+
+  const openNewTabBtn = document.getElementById('btnOpenProofInNewTab');
+  if (openNewTabBtn) {
+    openNewTabBtn.onclick = () => {
+      const win = window.open();
+      if (win) {
+        win.document.write(`
+          <!DOCTYPE html><html><head><title>Bukti Transaksi</title>
+          <style>body{margin:0;background:#0b1120;display:flex;align-items:center;justify-content:center;min-height:100vh;}img{max-width:95vw;max-height:95vh;object-fit:contain;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.5);}</style>
+          </head><body><img src="${imgUrl}" alt="Bukti Transaksi" /></body></html>
+        `);
+      }
+    };
+  }
+
+  const modal = document.getElementById('modalProofImageViewer');
+  modal.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    modal.classList.add('modal-open');
+    if (window.lucide) window.lucide.createIcons();
+  });
+}
+
+function closeProofImageViewer() {
+  const modal = document.getElementById('modalProofImageViewer');
+  if (!modal) return;
+  modal.classList.remove('modal-open');
+  setTimeout(() => {
+    modal.classList.add('hidden');
+  }, 180);
+}
+
+function setupProofImageDropzone() {
+  const container = document.getElementById('txProofImageContainer');
+  if (!container) return;
+
+  ['dragenter', 'dragover'].forEach((eventName) => {
+    container.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dropBox = document.getElementById('txProofImageEmptyState');
+      if (dropBox) dropBox.classList.add('border-emerald-500', 'bg-slate-800/80');
+    }, false);
+  });
+
+  ['dragleave', 'drop'].forEach((eventName) => {
+    container.addEventListener(eventName, (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const dropBox = document.getElementById('txProofImageEmptyState');
+      if (dropBox) dropBox.classList.remove('border-emerald-500', 'bg-slate-800/80');
+    }, false);
+  });
+
+  container.addEventListener('drop', (e) => {
+    const dt = e.dataTransfer;
+    const files = dt && dt.files;
+    if (files && files.length > 0 && files[0].type.startsWith('image/')) {
+      processAndSetProofImage(files[0]);
+    }
+  }, false);
+}
+
+// Listener paste gambar (Ctrl+V) saat modal transaksi terbuka
+window.addEventListener('paste', (e) => {
+  const txModal = document.getElementById('modalTransaction');
+  if (!txModal || txModal.classList.contains('hidden')) return;
+
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      const file = items[i].getAsFile();
+      if (file) {
+        processAndSetProofImage(file);
+        break;
+      }
+    }
+  }
+});
+
 function openTransactionModal(defaultTypeOverride = null) {
   state.editingTxId = null;
   document.getElementById('modalTxTitle').textContent = t('btn_add_tx');
@@ -7378,12 +7838,14 @@ function openTransactionModal(defaultTypeOverride = null) {
   document.getElementById('txAmountPreview').textContent = formatRp(0);
   document.getElementById('txNote').value = '';
   clearFieldValidationError('txAmount', 'txAmountError');
+  resetProofImageUI();
 
   const modal = document.getElementById('modalTransaction');
   modal.classList.remove('hidden');
   requestAnimationFrame(() => {
     modal.classList.add('modal-open');
     document.getElementById('txAmount').focus();
+    if (window.lucide) window.lucide.createIcons();
   });
 }
 
@@ -7413,17 +7875,20 @@ function openEditTransactionModal(txId) {
   document.getElementById('txAmountPreview').textContent = formatRp(tx.amount);
   document.getElementById('txNote').value = tx.note || '';
   clearFieldValidationError('txAmount', 'txAmountError');
+  setProofImageUI(tx.proofImage || null);
 
   const modal = document.getElementById('modalTransaction');
   modal.classList.remove('hidden');
   requestAnimationFrame(() => {
     modal.classList.add('modal-open');
+    if (window.lucide) window.lucide.createIcons();
   });
 }
 
 function closeTransactionModal() {
   closeCustomSelectPortal();
   clearFieldValidationError('txAmount', 'txAmountError');
+  resetProofImageUI();
   const modal = document.getElementById('modalTransaction');
   modal.classList.remove('modal-open');
   setTimeout(() => {
@@ -7454,6 +7919,7 @@ function handleTransactionFormSubmit(e) {
   const note = document.getElementById('txNote').value.trim();
   const quadrant = parseInt(document.getElementById('txQuadrant').value, 10) || 2;
   const expenseType = document.getElementById('txExpenseType').value || 'needs';
+  const proofImage = currentTxProofImage || null;
 
   if (!amount || amount <= 0) {
     showFieldValidationError('txAmount', 'txAmountError', `> ${formatRp(0)}`);
@@ -7474,7 +7940,8 @@ function handleTransactionFormSubmit(e) {
         account,
         note,
         quadrant,
-        expenseType: type === 'Expense' ? expenseType : undefined
+        expenseType: type === 'Expense' ? expenseType : undefined,
+        proofImage
       };
       showToast(`${translateCategoryName(category)} — ${t('modal_tx_update')}!`);
     }
@@ -7488,7 +7955,8 @@ function handleTransactionFormSubmit(e) {
       account,
       note,
       quadrant,
-      expenseType: type === 'Expense' ? expenseType : undefined
+      expenseType: type === 'Expense' ? expenseType : undefined,
+      proofImage
     };
     state.transactions.push(newTx);
     showToast(`${formatRp(amount)} • ${translateCategoryName(category)} (${account})!`);
@@ -7500,6 +7968,7 @@ function handleTransactionFormSubmit(e) {
     state.selectedMonth = txMonth - 1;
   }
   saveTransactionsToStorage();
+  resetProofImageUI();
   closeTransactionModal();
   refreshDashboard();
 }
@@ -8133,7 +8602,8 @@ function exportFilteredToCSV() {
     t('th_tx_category'),
     `${t('th_tx_amount')} (${cur.symbol})`,
     t('th_tx_wallet'),
-    t('modal_tx_note_label')
+    t('modal_tx_note_label'),
+    'Bukti Foto'
   ];
   const rows = filteredTx.map((tx) => [
     tx.date,
@@ -8141,7 +8611,8 @@ function exportFilteredToCSV() {
     `"${translateCategoryName(tx.category || '').replace(/"/g, '""')}"`,
     tx.amount,
     `"${(tx.account || '').replace(/"/g, '""')}"`,
-    `"${(tx.note || '').replace(/"/g, '""')}"`
+    `"${(tx.note || '').replace(/"/g, '""')}"`,
+    tx.proofImage ? '"Ada"' : '"Tidak Ada"'
   ]);
 
   const csvContent =
@@ -8407,9 +8878,12 @@ function initApp() {
     if (window.lucide) window.lucide.createIcons();
   });
 
+  setupProofImageDropzone();
+
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeCustomSelectPortal();
+      closeProofImageViewer();
       closeTransactionModal();
       closeBudgetModal();
       closeAddCategoryModal();
